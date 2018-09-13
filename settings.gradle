@@ -1,0 +1,16 @@
+def owCloudantPath = './openwhisk-cloudant'
+def owCloudantDirectory = new File(owCloudantPath)
+
+include 'cloudanttests'; project(':cloudanttests').projectDir = new File(owCloudantDirectory, 'tests')
+include 'tests'
+
+rootProject.name = 'trigger-cloudant'
+
+gradle.ext.openwhisk = [
+        version: '1.0.0-SNAPSHOT'
+]
+
+gradle.ext.scala = [
+    version: '2.11.11',
+    compileFlags: ['-feature', '-unchecked', '-deprecation', '-Xfatal-warnings', '-Ywarn-unused-import']
+]

@@ -1,0 +1,2 @@
+ext.dockerImageName = 'cloudant-provider'
+apply from: 'gradle/docker.gradle'

@@ -1,0 +1,8 @@
+{
+  "name": "cloudant-trigger-ibm",
+  "version": "1.0.0",
+  "license": "ISC",
+  "dependencies": {
+    "@ibm-functions/iam-token-manager": "^1.0.0"
+  }
+}
