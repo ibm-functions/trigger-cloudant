@@ -26,6 +26,13 @@ task testHealth(type: Test) {
     include 'system/health/**'
 }
 
+task testFeed(type: Test) {
+    systemProperty 'test.router', 'true'
+    include 'system/health/**'
+    include 'system/packages/CloudantFeed*'
+
+}
+
 dependencies {
     compile "org.scala-lang:scala-library:${gradle.scala.version}"
     compile project(':cloudanttests')

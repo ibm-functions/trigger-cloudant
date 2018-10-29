@@ -8,6 +8,7 @@ fi
 cp config.js ./openwhisk-cloudant/actions/event-actions/lib/config.js
 
 export ACTION_RUNTIME_VERSION=nodejs:8
+export INSTALL_FEED_ONLY=true
 
 cd openwhisk-cloudant
 ./installCatalog.sh $1 $2 $3 $4 $5 $6

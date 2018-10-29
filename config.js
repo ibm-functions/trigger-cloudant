@@ -15,6 +15,24 @@ function getOpenWhiskConfig(triggerData) {
 function addAdditionalData(params) {
     var additionalData = {};
 
+    if (params.__bx_creds && params.__bx_creds.cloudantNoSQLDB) {
+        var cloudantCreds = params.__bx_creds.cloudantNoSQLDB;
+        if (!params.host) {
+            params.host = cloudantCreds.host || (cloudantCreds.username + '.cloudant.com');
+        }
+        if (!params.iamApiKey && !cloudantCreds.apikey) {
+            if (!params.username) {
+                params.username = cloudantCreds.username;
+            }
+            if (!params.password) {
+                params.password = cloudantCreds.password;
+            }
+        }
+        else if (!params.iamApiKey) {
+            params.iamApiKey = cloudantCreds.apikey;
+        }
+    }
+
     if (process.env.__OW_IAM_NAMESPACE_API_KEY) {
         additionalData.iamApikey = process.env.__OW_IAM_NAMESPACE_API_KEY;
         additionalData.iamUrl = process.env.__OW_IAM_API_URL;
