@@ -15,8 +15,8 @@ function getOpenWhiskConfig(triggerData) {
 function addAdditionalData(params) {
     var additionalData = {};
 
-    if (params.__bx_creds && params.__bx_creds.cloudantNoSQLDB) {
-        var cloudantCreds = params.__bx_creds.cloudantNoSQLDB;
+    if (params.__bx_creds && (params.__bx_creds.cloudantnosqldb || params.__bx_creds.cloudantNoSQLDB)) {
+        var cloudantCreds = params.__bx_creds.cloudantnosqldb || params.__bx_creds.cloudantNoSQLDB;
         if (!params.host) {
             params.host = cloudantCreds.host || (cloudantCreds.username + '.cloudant.com');
         }
