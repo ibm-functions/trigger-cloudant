@@ -7,7 +7,7 @@ fi
 
 cp config.js ./openwhisk-cloudant/actions/event-actions/lib/config.js
 
-export ACTION_RUNTIME_VERSION=nodejs:8
+export ACTION_RUNTIME_VERSION=nodejs:10
 export INSTALL_FEED_ONLY=true
 
 cd openwhisk-cloudant
