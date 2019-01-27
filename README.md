@@ -1,16 +1,29 @@
 # Using the Cloudant package
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
-[![Build Status](https://travis-ci.org/apache/incubator-openwhisk-package-cloudant.svg?branch=master)](https://travis-ci.org/apache/incubator-openwhisk-package-cloudant)
 
-The `/whisk.system/cloudant` package enables you to work with a Cloudant database. It includes the following actions and feeds.
+The `/whisk.system/cloudant` package enables you to work with a Cloudant database. It includes the following feed action.
 
 | Entity | Type | Parameters | Description |
 | --- | --- | --- | --- |
 | `/whisk.system/cloudant` | package | dbname, host, username, password | Work with a Cloudant database |
-| `/whisk.system/cloudant/read` | action | dbname, id | Read a document from a database |
-| `/whisk.system/cloudant/write` | action | dbname, overwrite, doc | Write a document to a database |
-| `/whisk.system/cloudant/changes` | feed | dbname, filter, query_params, maxTriggers | Fire trigger events on changes to a database |
+| `/whisk.system/cloudant/changes` | feed | dbname, iamApiKey, iamUrl, filter, query_params, maxTriggers | Fire trigger events on changes to a database |
+
+## Firing a trigger on database changes
+
+Use the `changes` feed to configure a service to fire a trigger on every change to your Cloudant database. The parameters are as follows:
+
+- `dbname` (*required*): The name of the Cloudant database.
+
+- `iamApiKey` (*optional*): The IAM API key for the Cloudant database.  If specified will be used as the credentials instead of username and password.
+
+- `iamUrl` (*optional*): The IAM token service url that is used when `iamApiKey` is specified.  Defaults to `https://iam.bluemix.net/identity/token`. 
+
+- `maxTriggers` (*optional*): Stop firing triggers when this limit is reached.  Defaults to infinite.
+
+- `filter` (*optional*): Filter function that is defined on a design document.
+
+- `query_params` (*optional*): Extra query parameters for the filter function.
 
 The following topics walk through setting up a Cloudant database, configuring an associated package, and using the actions and feeds in the `/whisk.system/cloudant` package.
 
@@ -178,85 +191,5 @@ Be sure to replace `/_/myCloudant` with your package name.
       ]
   }
   ```
-
-## Writing to a Cloudant database
-
-You can use an action to store a document in a Cloudant database called `testdb`. Make sure that this database exists in your Cloudant account.
-
-1. Store a document by using the `write` action in the package binding you created previously. Be sure to replace `/_/myCloudant` with your package name.
-
-  ```
-  wsk action invoke /_/myCloudant/write --blocking --result --param dbname testdb --param doc "{\"_id\":\"heisenberg\",\"name\":\"Walter White\"}"
-  ```
-  ```
-  ok: invoked /_/myCloudant/write with id 62bf696b38464fd1bcaff216a68b8287
-  ```
-  ```json
-  {
-    "id": "heisenberg",
-    "ok": true,
-    "rev": "1-9a94fb93abc88d8863781a248f63c8c3"
-  }
-  ```
-
-2. Verify that the document exists by browsing for it in your Cloudant dashboard.
-
-  The dashboard URL for the `testdb` database looks something like the following: `https://MYCLOUDANTACCOUNT.cloudant.com/dashboard.html#database/testdb/_all_docs?limit=100`.
-
-
-## Reading from a Cloudant database
-
-You can use an action to fetch a document from a Cloudant database called `testdb`. Make sure that this database exists in your Cloudant account.
-
-- Fetch a document by using the `read` action in the package binding that you created previously. Be sure to replace `/_/myCloudant` with your package name.
-
-  ```
-  wsk action invoke /_/myCloudant/read --blocking --result --param dbname testdb --param id heisenberg
-  ```
-  ```json
-  {
-    "_id": "heisenberg",
-    "_rev": "1-9a94fb93abc88d8863781a248f63c8c3",
-    "name": "Walter White"
-  }
-  ```
-
-## Using an action sequence and a change trigger to process a document from a Cloudant database
-
-You can use an action sequence in a rule to fetch and process the document associated with a Cloudant change event.
-
-Here is a sample code of an action that handles a document:
-```javascript
-function main(doc){
-  return { "isWalter:" : doc.name === "Walter White"};
-}
-```
-
-Create the action to process the document from Cloudant:
-```
-wsk action create myAction myAction.js
-```
-
-To read a document from the database, you can use the `read` action from the Cloudant package.
-The `read` action may be composed with `myAction` to create an action sequence.
-```
-wsk action create sequenceAction --sequence /_/myCloudant/read,myAction
-```
-
-The action `sequenceAction` may be used in a rule that activates the action on new Cloudant trigger events.
-```
-wsk rule create myRule myCloudantTrigger sequenceAction
-```
-
-**Note** The Cloudant `changes` trigger used to support the parameter `includeDoc` which is not longer supported.
-  You will need to recreate triggers previously created with `includeDoc`. Follow these steps to recreate the trigger:
-  ```
-  wsk trigger delete myCloudantTrigger
-  ```
-  ```
-  wsk trigger create myCloudantTrigger --feed /_/myCloudant/changes --param dbname testdb
-  ```
-
-  The example illustrated above may be used to create an action sequence to read the changed document and call your existing actions.
-  Remember to disable any rules that may no longer be valid and create new ones using the action sequence pattern.
+  
 
