@@ -6,8 +6,7 @@ if [ ! -d ./openwhisk-cloudant ]; then
 fi
 
 cp config.js ./openwhisk-cloudant/actions/event-actions/lib/config.js
-
-export INSTALL_FEED_ONLY=true
+cp installCloudant.sh ./openwhisk-cloudant/installCatalog.sh
 
 cd openwhisk-cloudant
 ./installCatalog.sh $1 $2 $3 $4 $5 $6
