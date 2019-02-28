@@ -1,4 +1,4 @@
-FROM openwhisk/cloudantprovider:1.9.2
+FROM openwhisk/cloudantprovider:1.9.3
 
 COPY package.json /cloudantTrigger/
 RUN cd /cloudantTrigger && npm install --production
