@@ -1,4 +1,4 @@
-FROM openwhisk/cloudantprovider:dafcad1
+FROM openwhisk/cloudantprovider:bb5765a
 
 RUN apt-get update && apt-get upgrade -y
 
