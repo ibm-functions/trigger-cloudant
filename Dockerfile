@@ -1,4 +1,4 @@
-FROM openwhisk/cloudantprovider:bb5765a
+FROM openwhisk/cloudantprovider:09d101d
 
 RUN apt-get update && apt-get upgrade -y
 
