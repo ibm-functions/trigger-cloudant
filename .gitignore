@@ -1,4 +1,8 @@
 .gradle
 build/
 node_modules/
-openwhisk-cloudant/
+.env
+.vscode
+action/*.zip
+action/package.json
+package-lock.json

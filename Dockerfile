@@ -1,8 +1,8 @@
-FROM openwhisk/cloudantprovider:b7b9994
+FROM node:10.16.3
 
 RUN apt-get update && apt-get upgrade -y
 
-COPY package.json /cloudantTrigger/
+ADD package.json /cloudantTrigger/
 RUN cd /cloudantTrigger && npm install --production
 
-COPY authHandler.js /cloudantTrigger/lib/
+ADD provider/. /cloudantTrigger/

@@ -1,7 +1,3 @@
-def owCloudantPath = './openwhisk-cloudant'
-def owCloudantDirectory = new File(owCloudantPath)
-
-include 'cloudanttests'; project(':cloudanttests').projectDir = new File(owCloudantDirectory, 'tests')
 include 'tests'
 
 rootProject.name = 'trigger-cloudant'
