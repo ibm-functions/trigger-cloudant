@@ -16,6 +16,6 @@
     "redis": "^2.7.1",
     "bluebird": "^3.5.0",
     "systeminformation": "^3.19.0",
-    "@ibm-functions/iam-token-manager": "^1.0.0"
+    "@ibm-functions/iam-token-manager": "1.0.4"
   }
 }
