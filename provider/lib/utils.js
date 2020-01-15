@@ -141,9 +141,13 @@ module.exports = function(logger, triggerDB, redisClient) {
         return trigger;
     }
 
-    function shouldDisableTrigger(statusCode) {
-        return ((statusCode >= 400 && statusCode < 500) &&
+    function shouldDisableTrigger(statusCode, headers) {
+        return ((statusCode >= 400 && statusCode < 500) && hasTransactionIdHeader(headers) &&
             [HttpStatus.REQUEST_TIMEOUT, HttpStatus.TOO_MANY_REQUESTS, HttpStatus.CONFLICT].indexOf(statusCode) === -1);
+    }
+
+    function hasTransactionIdHeader(headers) {
+        return headers && headers['x-request-id'];
     }
 
     function shouldFireTrigger(trigger) {
@@ -268,7 +272,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                         }
                         logger.error(method, 'there was an error invoking', triggerData.id, statusCode || error);
 
-                        if (statusCode && shouldDisableTrigger(statusCode)) {
+                        if (statusCode && shouldDisableTrigger(statusCode, response.headers)) {
                             var message;
                             try {
                                 message = error.error.errorMessage;
@@ -332,7 +336,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                             url: triggerURL
                         }, function (error, response) {
                             //disable trigger in database if trigger is dead
-                            if (!error && shouldDisableTrigger(response.statusCode)) {
+                            if (!error && shouldDisableTrigger(response.statusCode, response.headers)) {
                                 var message = 'Automatically disabled after receiving a ' + response.statusCode + ' status code on init trigger';
                                 disableTrigger(triggerIdentifier, response.statusCode, message);
                                 logger.error(method, 'trigger', triggerIdentifier, 'has been disabled due to status code:', response.statusCode);
