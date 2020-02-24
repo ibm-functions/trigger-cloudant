@@ -264,6 +264,7 @@ module.exports = function(logger, triggerDB, redisClient) {
             }, function(error, response) {
                 try {
                     var statusCode = !error ? response.statusCode : error.statusCode;
+                    var headers = response ? response.headers : undefined;
                     logger.info(method, triggerData.id, 'http post request, STATUS:', statusCode);
                     if (error || statusCode >= 400) {
                         // only manage trigger fires if they are not infinite
@@ -272,7 +273,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                         }
                         logger.error(method, 'there was an error invoking', triggerData.id, statusCode || error);
 
-                        if (statusCode && shouldDisableTrigger(statusCode, response.headers)) {
+                        if (statusCode && shouldDisableTrigger(statusCode, headers)) {
                             var message;
                             try {
                                 message = error.error.errorMessage;
