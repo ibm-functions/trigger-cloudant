@@ -218,7 +218,6 @@ function init(server) {
         return providerUtils.initRedis();
     })
     .then(() => {
-        var providerRAS = new ProviderRAS();
         var providerHealth = new ProviderHealth(logger, providerUtils);
         var providerActivation = new ProviderActivation(logger, providerUtils);
 
