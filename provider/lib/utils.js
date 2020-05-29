@@ -142,7 +142,7 @@ module.exports = function(logger, triggerDB, redisClient) {
     }
 
     function shouldDisableTrigger(statusCode, headers) {
-        return ((statusCode >= 400 && statusCode < 500) && hasTransactionIdHeader(headers) &&
+        return statusCode === HttpStatus.BAD_REQUEST || ((statusCode > 400 && statusCode < 500) && hasTransactionIdHeader(headers) &&
             [HttpStatus.REQUEST_TIMEOUT, HttpStatus.TOO_MANY_REQUESTS, HttpStatus.CONFLICT].indexOf(statusCode) === -1);
     }
 
