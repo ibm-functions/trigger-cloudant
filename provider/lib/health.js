@@ -21,7 +21,7 @@ var _ = require('lodash');
 var URL = require('url').URL;
 var constants = require('./constants.js');
 
-module.exports = function(logger, utils) {
+module.exports = function(logger, manager) {
 
     // Health Endpoint
     this.endPoint = '/health';
@@ -34,7 +34,7 @@ module.exports = function(logger, utils) {
     // Health Logic
     this.health = function (req, res) {
 
-        var stats = {triggerCount: Object.keys(utils.triggers).length};
+        var stats = {triggerCount: Object.keys(manager.triggers).length};
 
         // get all system stats in parallel
         Promise.all([
@@ -42,7 +42,7 @@ module.exports = function(logger, utils) {
             si.currentLoad(),
             si.fsSize(),
             si.networkStats(),
-            si.inetLatency(utils.routerHost)
+            si.inetLatency(manager.routerHost)
         ])
         .then(results => {
             stats.triggerMonitor = monitorStatus;
@@ -64,8 +64,8 @@ module.exports = function(logger, utils) {
         var method = 'monitor';
 
         if (triggerName) {
-            monitorStatus = Object.assign({}, utils.monitorStatus);
-            utils.monitorStatus = {};
+            monitorStatus = Object.assign({}, manager.monitorStatus);
+            manager.monitorStatus = {};
 
             var monitorStatusSize = Object.keys(monitorStatus).length;
             if (monitorStatusSize < 5) {
@@ -79,7 +79,7 @@ module.exports = function(logger, utils) {
             //delete the trigger
             var triggerData = {
                 apikey: apikey,
-                uri: utils.uriHost + '/api/v1/namespaces/_/triggers/' + triggerName,
+                uri: manager.uriHost + '/api/v1/namespaces/_/triggers/' + triggerName,
                 triggerID: existingTriggerID
             };
             deleteTrigger(triggerData, 0);
@@ -89,25 +89,25 @@ module.exports = function(logger, utils) {
         }
 
         //create new cloudant trigger and canary doc
-        var docSuffix = utils.worker + utils.host + '_' + Date.now();
+        var docSuffix = manager.worker + manager.host + '_' + Date.now();
         triggerName = 'cloudant_' + docSuffix;
         canaryDocID = 'canary_' + docSuffix;
 
         //update status monitor object
-        utils.monitorStatus.triggerName = triggerName;
-        utils.monitorStatus.triggerType = 'changes';
+        manager.monitorStatus.triggerName = triggerName;
+        manager.monitorStatus.triggerType = 'changes';
 
-        var triggerURL = utils.uriHost + '/api/v1/namespaces/_/triggers/' + triggerName;
+        var triggerURL = manager.uriHost + '/api/v1/namespaces/_/triggers/' + triggerName;
         var triggerID = `:_:${triggerName}`;
         createTrigger(triggerURL, apikey)
         .then(info => {
             logger.info(method, triggerID, info);
             var newTrigger = createCloudantTrigger(triggerID, apikey);
-            utils.createTrigger(newTrigger);
+            manager.createTrigger(newTrigger);
             setTimeout(function () {
                 var canaryDoc = {
                     isCanaryDoc: true,
-                    host: utils.host
+                    host: manager.host
                 };
                 createDocInDB(canaryDocID, canaryDoc);
             }, monitoringInterval / 3);
@@ -120,8 +120,8 @@ module.exports = function(logger, utils) {
     function createCloudantTrigger(triggerID, apikey) {
         var method = 'createCloudantTrigger';
 
-        var dbURL = new URL(utils.db.config.url);
-        var dbName = utils.db.config.db;
+        var dbURL = new URL(manager.db.config.url);
+        var dbName = manager.db.config.db;
 
         var newTrigger = {
             apikey: apikey,
@@ -133,12 +133,12 @@ module.exports = function(logger, utils) {
             user: dbURL.username,
             pass: dbURL.password,
             filter: constants.MONITOR_DESIGN_DOC + '/' + constants.DOCS_FOR_MONITOR,
-            query_params: {host: utils.host},
+            query_params: {host: manager.host},
             maxTriggers: 1,
             triggersLeft: 1,
             since: 'now',
-            worker: utils.worker,
-            monitor: utils.host
+            worker: manager.worker,
+            monitor: manager.host
         };
 
         return newTrigger;
@@ -148,7 +148,7 @@ module.exports = function(logger, utils) {
         var method = 'createTrigger';
 
         return new Promise(function(resolve, reject) {
-            utils.authRequest({apikey: apikey}, {
+            manager.authRequest({apikey: apikey}, {
                 method: 'put',
                 uri: triggerURL,
                 json: true,
@@ -167,7 +167,7 @@ module.exports = function(logger, utils) {
     function createDocInDB(docID, doc) {
         var method = 'createDocInDB';
 
-        utils.db.insert(doc, docID, function (err) {
+        manager.db.insert(doc, docID, function (err) {
             if (!err) {
                 logger.info(method, docID, 'was successfully inserted');
             }
@@ -181,7 +181,7 @@ module.exports = function(logger, utils) {
         var method = 'deleteTrigger';
 
         var triggerID = triggerData.triggerID;
-        utils.authRequest(triggerData, {
+        manager.authRequest(triggerData, {
             method: 'delete',
             uri: triggerData.uri
         }, function (error, response) {
@@ -206,9 +206,9 @@ module.exports = function(logger, utils) {
         var method = 'deleteDocFromDB';
 
         //delete from database
-        utils.db.get(docID, function (err, existing) {
+        manager.db.get(docID, function (err, existing) {
             if (!err) {
-                utils.db.destroy(existing._id, existing._rev, function (err) {
+                manager.db.destroy(existing._id, existing._rev, function (err) {
                     if (err) {
                         if (err.statusCode === 409 && retryCount < 5) {
                             setTimeout(function () {
