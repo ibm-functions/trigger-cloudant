@@ -10,13 +10,13 @@ script:
 - "./tools/travis/build.sh"
 deploy:
 - provider: script
-  script: "./tools/travis/publish.sh ibmfunctions $TRAVIS_TAG"
+  script: "./tools/travis/publish.sh ibmfunctions cloudant-provider $TRAVIS_TAG"
   on:
     tags: true
     all_branches: true
     repo: ibm-functions/trigger-cloudant
 - provider: script
-  script: "./tools/travis/publish.sh ibmfunctions latest"
+  script: "./tools/travis/publish.sh ibmfunctions cloudant-provider nightly"
   on:
     branch: master
     repo: ibm-functions/trigger-cloudant
