@@ -249,6 +249,7 @@ module.exports = function(logger, triggerDB, redisClient) {
 
     function postTrigger(triggerData, form, uri, retryCount) {
         var method = 'postTrigger';
+        var isIAMNamespace = triggerData.additionalData && triggerData.additionalData.iamApikey;
 
         return new Promise(function(resolve, reject) {
 
@@ -273,7 +274,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                         }
                         logger.error(method, 'there was an error invoking', triggerData.id, statusCode || error);
 
-                        if (statusCode && (statusCode === HttpStatus.FORBIDDEN || statusCode === HttpStatus.UNAUTHORIZED) && triggerData.additionalData) {
+                        if (statusCode && (statusCode === HttpStatus.FORBIDDEN || statusCode === HttpStatus.UNAUTHORIZED) && isIAMNamespace) {
                             reject(`Received a ${statusCode} status code from IAM SPI: ${triggerData.id}`);
                         }
                         else if (statusCode && shouldDisableTrigger(statusCode)) {
