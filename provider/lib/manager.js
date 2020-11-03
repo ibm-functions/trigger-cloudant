@@ -254,7 +254,7 @@ module.exports = function(logger, triggerDB, redisClient) {
         return new Promise(function(resolve, reject) {
 
             // only manage trigger fires if they are not infinite
-            if (triggerData.maxTriggers !== -1) {
+            if (triggerData.maxTriggers && triggerData.maxTriggers !== -1) {
                 triggerData.triggersLeft--;
             }
 
@@ -264,31 +264,38 @@ module.exports = function(logger, triggerDB, redisClient) {
                 json: form
             }, function(error, response) {
                 try {
-                    var statusCode = !error ? response.statusCode : error.statusCode;
+                    var statusCode = response ? response.statusCode : undefined;
                     var headers = response ? response.headers : undefined;
                     logger.info(method, triggerData.id, 'http post request, STATUS:', statusCode);
-                    if (error || statusCode >= 400) {
-                        // only manage trigger fires if they are not infinite
-                        if (triggerData.maxTriggers !== -1) {
-                            triggerData.triggersLeft++;
+
+                    //check for IAM auth error and ignore for now (do not disable) due to bug with IAM
+                    if (error && error.statusCode === 400) {
+                        var message;
+                        try {
+                            message = error.error.errorMessage;
+                        } catch (e) {
+                            message = `Received an error when generating IAM token: ${error}`;
                         }
+                        reject(message);
+                    }
+                    else if (error || statusCode >= 400) {
                         logger.error(method, 'there was an error invoking', triggerData.id, statusCode || error);
 
+                        // only manage trigger fires if they are not infinite
+                        if (triggerData.maxTriggers && triggerData.maxTriggers !== -1) {
+                            triggerData.triggersLeft++;
+                        }
+                        // do not disable for 401s or 403s for IAM namespaces for now due to issue with the controller (PEP)
                         if (statusCode && (statusCode === HttpStatus.FORBIDDEN || statusCode === HttpStatus.UNAUTHORIZED) && isIAMNamespace) {
                             reject(`Received a ${statusCode} status code from IAM SPI: ${triggerData.id}`);
                         }
-                        else if (statusCode && shouldDisableTrigger(statusCode)) {
-                            var message;
-                            try {
-                                message = error.error.errorMessage;
-                            } catch (e) {
-                                message = `Received a ${statusCode} status code when firing the trigger`;
-                            }
-                            disableTrigger(triggerData.id, statusCode, `Trigger automatically disabled: ${message}`);
-                            reject(`Disabled trigger ${triggerData.id}: ${message}`);
+                        else if (statusCode && shouldDisableTrigger(statusCode, headers)) {
+                            var errMsg = `Received a ${statusCode} status code when firing the trigger`;
+                            disableTrigger(triggerData.id, statusCode, `Trigger automatically disabled: ${errMsg}`);
+                            reject(`Disabled trigger ${triggerData.id}: ${errMsg}`);
                         }
                         else {
-                            if (retryCount < retryAttempts ) {
+                            if (retryCount < retryAttempts) {
                                 var timeout = statusCode === 429 && retryCount === 0 ? 60000 : 1000 * Math.pow(retryCount + 1, 2);
                                 logger.info(method, 'attempting to fire trigger again', triggerData.id, 'Retry Count:', (retryCount + 1));
                                 setTimeout(function () {
