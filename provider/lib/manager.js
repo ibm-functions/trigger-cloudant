@@ -227,7 +227,7 @@ module.exports = function(logger, triggerDB, redisClient) {
         var form = change;
         form.dbname = triggerData.dbname;
 
-        logger.info(method, 'firing trigger', triggerData.id, 'with db update');
+        logger.info(method, 'Database change detected for', triggerData.id);
 
         var host = 'https://' + self.routerHost;
         var uri = host + '/api/v1/namespaces/' + triggerObj.namespace + '/triggers/' + triggerObj.name;
@@ -272,20 +272,20 @@ module.exports = function(logger, triggerDB, redisClient) {
                 try {
                     var statusCode = response ? response.statusCode : undefined;
                     var headers = response ? response.headers : undefined;
-                    logger.info(method, triggerData.id, 'http post request, STATUS:', statusCode);
+                    var triggerIdentifier = triggerData.id;
 
                     //check for IAM auth error and ignore for now (do not disable) due to bug with IAM
                     if (error && error.statusCode === 400) {
                         var message;
                         try {
-                            message = error.error.errorMessage;
+                            message = `${error.error.errorMessage} for ${triggerIdentifier}, requestId: ${error.error.context.requestId}`;
                         } catch (e) {
-                            message = `Received an error when generating IAM token: ${error}`;
+                            message = `Received an error generating IAM token for ${triggerIdentifier}`;
                         }
                         reject(message);
                     }
                     else if (error || statusCode >= 400) {
-                        logger.error(method, 'there was an error invoking', triggerData.id, statusCode || error);
+                        logger.error(method, 'Received an error invoking', triggerIdentifier, statusCode || error);
 
                         // only manage trigger fires if they are not infinite
                         if (triggerData.maxTriggers && triggerData.maxTriggers !== -1) {
@@ -293,13 +293,13 @@ module.exports = function(logger, triggerDB, redisClient) {
                         }
                        if (statusCode && shouldDisableTrigger(statusCode, headers, false, isIAMNamespace)) {
                             var errMsg = `Received a ${statusCode} status code when firing the trigger`;
-                            disableTrigger(triggerData.id, statusCode, `Trigger automatically disabled: ${errMsg}`);
-                            reject(`Disabled trigger ${triggerData.id}: ${errMsg}`);
+                            disableTrigger(triggerIdentifier, statusCode, `Trigger automatically disabled: ${errMsg}`);
+                            reject(`Disabled trigger ${triggerIdentifier}: ${errMsg}`);
                         }
                         else {
                             if (retryCount < retryAttempts) {
                                 var timeout = statusCode === 429 && retryCount === 0 ? 60000 : 1000 * Math.pow(retryCount + 1, 2);
-                                logger.info(method, 'attempting to fire trigger again', triggerData.id, 'Retry Count:', (retryCount + 1));
+                                logger.info(method, 'Attempting to fire trigger again', triggerIdentifier, 'Retry Count:', (retryCount + 1));
                                 setTimeout(function () {
                                     postTrigger(triggerData, form, uri, (retryCount + 1))
                                     .then(triggerId => {
@@ -310,12 +310,12 @@ module.exports = function(logger, triggerDB, redisClient) {
                                     });
                                 }, timeout);
                             } else {
-                                reject('Unable to reach server to fire trigger ' + triggerData.id);
+                                reject('Unable to reach server to fire trigger ' + triggerIdentifier);
                             }
                         }
                     } else {
-                        logger.info(method, 'fired', triggerData.id, triggerData.triggersLeft, 'triggers left');
-                        resolve(triggerData.id);
+                        logger.info(method, 'Fire', triggerIdentifier, 'request,', 'Status Code:', statusCode);
+                        resolve(triggerIdentifier);
                     }
                 }
                 catch(err) {
@@ -543,14 +543,12 @@ module.exports = function(logger, triggerDB, redisClient) {
     }
 
     this.authRequest = function(triggerData, options, cb) {
-        var method = 'authRequest';
 
         authHandler.handleAuth(triggerData, options)
         .then(requestOptions => {
             request(requestOptions, cb);
         })
         .catch(err => {
-            logger.error(method, err);
             cb(err);
         });
     };
