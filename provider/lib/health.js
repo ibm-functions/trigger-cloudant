@@ -21,7 +21,7 @@ var _ = require('lodash');
 var URL = require('url').URL;
 var constants = require('./constants.js');
 
-module.exports = function(logger, manager) {
+module.exports = function (logger, manager) {
 
     // Health Endpoint
     this.endPoint = '/health';
@@ -60,7 +60,7 @@ module.exports = function(logger, manager) {
         });
     };
 
-    this.monitor = function(apikey, monitoringInterval) {
+    this.monitor = function (apikey, monitoringInterval) {
         var method = 'monitor';
 
         if (triggerName) {
@@ -118,12 +118,10 @@ module.exports = function(logger, manager) {
     };
 
     function createCloudantTrigger(triggerID, apikey) {
-        var method = 'createCloudantTrigger';
-
         var dbURL = new URL(manager.db.config.url);
         var dbName = manager.db.config.db;
 
-        var newTrigger = {
+        return {
             apikey: apikey,
             id: triggerID,
             host: dbURL.hostname,
@@ -140,14 +138,11 @@ module.exports = function(logger, manager) {
             worker: manager.worker,
             monitor: manager.host
         };
-
-        return newTrigger;
     }
 
     function createTrigger(triggerURL, apikey) {
-        var method = 'createTrigger';
 
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             manager.authRequest({apikey: apikey}, {
                 method: 'put',
                 uri: triggerURL,
@@ -156,8 +151,7 @@ module.exports = function(logger, manager) {
             }, function (error, response) {
                 if (error || response.statusCode >= 400) {
                     reject('monitoring trigger create request failed');
-                }
-                else {
+                } else {
                     resolve('monitoring trigger create request was successful');
                 }
             });
@@ -170,8 +164,7 @@ module.exports = function(logger, manager) {
         manager.db.insert(doc, docID, function (err) {
             if (!err) {
                 logger.info(method, docID, 'was successfully inserted');
-            }
-            else {
+            } else {
                 logger.error(method, docID, err);
             }
         });
@@ -195,8 +188,7 @@ module.exports = function(logger, manager) {
                 } else {
                     logger.error(method, triggerID, 'trigger delete request failed');
                 }
-            }
-            else {
+            } else {
                 logger.info(method, triggerID, 'trigger delete request was successful');
             }
         });
@@ -214,17 +206,14 @@ module.exports = function(logger, manager) {
                             setTimeout(function () {
                                 deleteDocFromDB(docID, (retryCount + 1));
                             }, 1000);
-                        }
-                        else {
+                        } else {
                             logger.error(method, docID, 'could not be deleted from the database');
                         }
-                    }
-                    else {
+                    } else {
                         logger.info(method, docID, 'was successfully deleted from the database');
                     }
                 });
-            }
-            else {
+            } else {
                 logger.error(method, docID, 'could not be found in the database');
             }
         });

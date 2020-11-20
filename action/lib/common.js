@@ -21,11 +21,11 @@ const config = require('./config');
 
 function requestHelper(url, input, method) {
 
-    return new Promise(function(resolve, reject) {
+    return new Promise(function (resolve, reject) {
 
         var options = {
-            method : method,
-            url : url,
+            method: method,
+            url: url,
             json: true,
             rejectUnauthorized: false
         };
@@ -36,17 +36,15 @@ function requestHelper(url, input, method) {
             options.body = input;
         }
 
-        request(options, function(error, response, body) {
+        request(options, function (error, response, body) {
 
             if (!error && response.statusCode === 200) {
                 resolve(body);
-            }
-            else {
+            } else {
                 if (response) {
                     console.log('cloudant: Error invoking whisk action:', response.statusCode, body);
                     reject(body);
-                }
-                else {
+                } else {
                     console.log('cloudant: Error invoking whisk action:', error);
                     reject(error);
                 }
@@ -65,6 +63,7 @@ function createWebParams(rawParams) {
     delete webparams.apihost;
 
     webparams.triggerName = triggerName;
+    webparams.encryptedAuth = process.env.__OW_API_KEY_ENCRYPTED;
     config.addAdditionalData(webparams);
 
     return webparams;
@@ -74,7 +73,7 @@ function verifyTriggerAuth(triggerData, isDelete) {
     var owConfig = config.getOpenWhiskConfig(triggerData);
     var ow = openwhisk(owConfig);
 
-    return new Promise(function(resolve, reject) {
+    return new Promise(function (resolve, reject) {
         ow.triggers.get(triggerData.name)
         .then(() => {
             resolve();
@@ -84,12 +83,10 @@ function verifyTriggerAuth(triggerData, isDelete) {
                var statusCode = err.statusCode;
                if (!(isDelete && statusCode === 404)) {
                    reject(sendError(statusCode, 'Trigger authentication request failed.'));
-               }
-               else {
+               } else {
                    resolve();
                }
-           }
-           else {
+           } else {
                reject(sendError(400, 'Trigger authentication request failed.', err.message));
            }
         });
@@ -119,7 +116,7 @@ function sendError(statusCode, error, message) {
 
     return {
         statusCode: statusCode,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json'},
         body: params
     };
 }
@@ -130,8 +127,7 @@ function constructObject(data) {
         if (typeof data === 'string') {
             try {
                 jsonObject = JSON.parse(data);
-            }
-            catch (e) {
+            } catch (e) {
                 console.log('error parsing ' + data);
             }
         }

@@ -20,12 +20,8 @@ var HttpStatus = require('http-status-codes');
 var constants = require('./constants.js');
 var authHandler = require('./authHandler');
 
-module.exports = function(logger, triggerDB, redisClient) {
+module.exports = function (logger, triggerDB, redisClient) {
 
-    var retryAttempts = constants.RETRY_ATTEMPTS;
-    var filterDDName = constants.FILTERS_DESIGN_DOC;
-    var viewDDName = constants.VIEWS_DESIGN_DOC;
-    var triggersByWorker = constants.TRIGGERS_BY_WORKER;
     var redisKeyPrefix = process.env.REDIS_KEY_PREFIX || triggerDB.config.db;
     var self = this;
 
@@ -40,11 +36,11 @@ module.exports = function(logger, triggerDB, redisClient) {
     this.redisClient = redisClient;
     this.redisKey = redisKeyPrefix + '_' + this.worker;
     this.redisField = constants.REDIS_FIELD;
-    this.uriHost ='https://' + this.routerHost;
+    this.uriHost = 'https://' + this.routerHost;
     this.monitorStatus = {};
 
     // Add a trigger: listen for changes and dispatch.
-    this.createTrigger = function(triggerData) {
+    this.createTrigger = function (triggerData) {
         var method = 'createTrigger';
 
         var Cloudant = require('@cloudant/cloudant');
@@ -55,9 +51,11 @@ module.exports = function(logger, triggerDB, redisClient) {
             if (triggerData.port) {
                 dbURL += ':' + triggerData.port;
             }
-            cloudantConnection = new Cloudant({ url: dbURL, plugins: { iamauth: { iamApiKey: triggerData.iamApiKey, iamTokenUrl: triggerData.iamUrl } } });
-        }
-        else {
+            cloudantConnection = new Cloudant({
+                url: dbURL,
+                plugins: {iamauth: {iamApiKey: triggerData.iamApiKey, iamTokenUrl: triggerData.iamUrl}}
+            });
+        } else {
             var url = `${triggerData.protocol}://${triggerData.user}:${triggerData.pass}@${triggerData.host}`;
             if (triggerData.port) {
                 url += ':' + triggerData.port;
@@ -94,9 +92,9 @@ module.exports = function(logger, triggerDB, redisClient) {
 
             feed.follow();
 
-            return new Promise(function(resolve, reject) {
+            return new Promise(function (resolve, reject) {
                 feed.on('error', function (err) {
-                    logger.error(method,'Error occurred for trigger', triggerData.id, '(db ' + triggerData.dbname + '):', err);
+                    logger.error(method, 'Error occurred for trigger', triggerData.id, '(db ' + triggerData.dbname + '):', err);
                     reject(err);
                 });
 
@@ -119,7 +117,7 @@ module.exports = function(logger, triggerDB, redisClient) {
     function initTrigger(newTrigger) {
         var maxTriggers = newTrigger.maxTriggers || constants.DEFAULT_MAX_TRIGGERS;
 
-        var trigger = {
+        return {
             id: newTrigger.id,
             host: newTrigger.host,
             port: newTrigger.port,
@@ -137,35 +135,6 @@ module.exports = function(logger, triggerDB, redisClient) {
             iamApiKey: newTrigger.iamApiKey,
             iamUrl: newTrigger.iamUrl
         };
-
-        return trigger;
-    }
-
-    function shouldDisableTrigger(statusCode, headers, isStartup, isIAMNamespace) {
-        //temporary workaround for IAM issues
-        // do not disable for 401s or 403s for IAM namespaces on trigger fire
-        if (!isStartup && (statusCode === HttpStatus.FORBIDDEN || statusCode === HttpStatus.UNAUTHORIZED) && isIAMNamespace) {
-            return false;
-        }
-
-        return statusCode === HttpStatus.BAD_REQUEST || ((statusCode > 400 && statusCode < 500) && hasTransactionIdHeader(headers) &&
-            [HttpStatus.REQUEST_TIMEOUT, HttpStatus.TOO_MANY_REQUESTS, HttpStatus.CONFLICT].indexOf(statusCode) === -1);
-    }
-
-    function hasTransactionIdHeader(headers) {
-        return headers && headers['x-request-id'];
-    }
-
-    function shouldFireTrigger(trigger) {
-        return trigger.monitor || self.activeHost === self.host;
-    }
-
-    function hasTriggersRemaining(trigger) {
-        return !trigger.maxTriggers || trigger.maxTriggers === -1 || trigger.triggersLeft > 0;
-    }
-
-    function isMonitoringTrigger(monitor, triggerIdentifier) {
-        return monitor && self.monitorStatus.triggerName === parseQName(triggerIdentifier).name;
     }
 
     function disableTrigger(id, statusCode, message) {
@@ -175,24 +144,21 @@ module.exports = function(logger, triggerDB, redisClient) {
             if (!err) {
                 if (!existing.status || existing.status.active === true) {
                     var updatedTrigger = existing;
-                    var status = {
+                    updatedTrigger.status = {
                         'active': false,
                         'dateChanged': Date.now(),
                         'reason': {'kind': 'AUTO', 'statusCode': statusCode, 'message': message}
                     };
-                    updatedTrigger.status = status;
 
                     triggerDB.insert(updatedTrigger, id, function (err) {
                         if (err) {
                             logger.error(method, 'there was an error while disabling', id, 'in database. ' + err);
-                        }
-                        else {
+                        } else {
                             logger.info(method, 'trigger', id, 'successfully disabled in database');
                         }
                     });
                 }
-            }
-            else {
+            } else {
                 logger.info(method, 'could not find', id, 'in database');
                 //make sure it is removed from memory as well
                 deleteTrigger(id);
@@ -241,8 +207,7 @@ module.exports = function(logger, triggerDB, redisClient) {
             if (triggerData.triggersLeft === 0) {
                 if (triggerData.monitor) {
                     deleteTrigger(triggerId, triggerData.monitor);
-                }
-                else {
+                } else {
                     disableTrigger(triggerId, undefined, 'Automatically disabled after reaching max triggers');
                     logger.warn(method, 'no more triggers left, disabled', triggerId);
                 }
@@ -257,7 +222,7 @@ module.exports = function(logger, triggerDB, redisClient) {
         var method = 'postTrigger';
         var isIAMNamespace = triggerData.additionalData && triggerData.additionalData.iamApikey;
 
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
 
             // only manage trigger fires if they are not infinite
             if (triggerData.maxTriggers && triggerData.maxTriggers !== -1) {
@@ -268,7 +233,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                 method: 'post',
                 uri: uri,
                 json: form
-            }, function(error, response) {
+            }, function (error, response) {
                 try {
                     var statusCode = response ? response.statusCode : undefined;
                     var headers = response ? response.headers : undefined;
@@ -280,24 +245,22 @@ module.exports = function(logger, triggerDB, redisClient) {
                         try {
                             message = `${error.error.errorMessage} for ${triggerIdentifier}, requestId: ${error.error.context.requestId}`;
                         } catch (e) {
-                            message = `Received an error generating IAM token for ${triggerIdentifier}`;
+                            message = `Received an error generating IAM token for ${triggerIdentifier}: ${e}`;
                         }
                         reject(message);
-                    }
-                    else if (error || statusCode >= 400) {
+                    } else if (error || statusCode >= 400) {
                         logger.error(method, 'Received an error invoking', triggerIdentifier, statusCode || error);
 
                         // only manage trigger fires if they are not infinite
                         if (triggerData.maxTriggers && triggerData.maxTriggers !== -1) {
                             triggerData.triggersLeft++;
                         }
-                       if (statusCode && shouldDisableTrigger(statusCode, headers, false, isIAMNamespace)) {
+                        if (statusCode && shouldDisableTrigger(statusCode, headers, isIAMNamespace)) {
                             var errMsg = `Received a ${statusCode} status code when firing the trigger`;
                             disableTrigger(triggerIdentifier, statusCode, `Trigger automatically disabled: ${errMsg}`);
                             reject(`Disabled trigger ${triggerIdentifier}: ${errMsg}`);
-                        }
-                        else {
-                            if (retryCount < retryAttempts) {
+                        } else {
+                            if (retryCount < constants.RETRY_ATTEMPTS) {
                                 var timeout = statusCode === 429 && retryCount === 0 ? 60000 : 1000 * Math.pow(retryCount + 1, 2);
                                 logger.info(method, 'Attempting to fire trigger again', triggerIdentifier, 'Retry Count:', (retryCount + 1));
                                 setTimeout(function () {
@@ -317,22 +280,52 @@ module.exports = function(logger, triggerDB, redisClient) {
                         logger.info(method, 'Fire', triggerIdentifier, 'request,', 'Status Code:', statusCode);
                         resolve(triggerIdentifier);
                     }
-                }
-                catch(err) {
+                } catch (err) {
                     reject('Exception occurred while firing trigger ' + err);
                 }
             });
         });
     }
 
-    this.initAllTriggers = function() {
+    function shouldDisableTrigger(statusCode, headers, isIAMNamespace) {
+        //temporary workaround for IAM issues
+        // do not disable for 401s or 403s for IAM namespaces
+        if ((statusCode === HttpStatus.FORBIDDEN || statusCode === HttpStatus.UNAUTHORIZED) && isIAMNamespace) {
+            return false;
+        }
+
+        return statusCode === HttpStatus.BAD_REQUEST || ((statusCode > 400 && statusCode < 500) && hasTransactionIdHeader(headers) &&
+            [HttpStatus.REQUEST_TIMEOUT, HttpStatus.TOO_MANY_REQUESTS, HttpStatus.CONFLICT].indexOf(statusCode) === -1);
+    }
+
+    function hasTransactionIdHeader(headers) {
+        return headers && headers['x-request-id'];
+    }
+
+    function shouldFireTrigger(trigger) {
+        return trigger.monitor || self.activeHost === self.host;
+    }
+
+    function hasTriggersRemaining(trigger) {
+        return !trigger.maxTriggers || trigger.maxTriggers === -1 || trigger.triggersLeft > 0;
+    }
+
+    function isMonitoringTrigger(monitor, triggerIdentifier) {
+        return monitor && self.monitorStatus.triggerName === parseQName(triggerIdentifier).name;
+    }
+
+    this.initAllTriggers = function () {
         var method = 'initAllTriggers';
 
         //follow the trigger DB
         setupFollow('now');
 
         logger.info(method, 'resetting system from last state');
-        triggerDB.view(viewDDName, triggersByWorker, {reduce: false, include_docs: true, key: self.worker}, function(err, body) {
+        triggerDB.view(constants.VIEWS_DESIGN_DOC, constants.TRIGGERS_BY_WORKER, {
+            reduce: false,
+            include_docs: true,
+            key: self.worker
+        }, function (err, body) {
             if (!err) {
                 body.rows.forEach(function (trigger) {
                     var triggerIdentifier = trigger.id;
@@ -343,18 +336,18 @@ module.exports = function(logger, triggerDB, redisClient) {
                         var triggerObj = parseQName(triggerIdentifier);
                         var host = 'https://' + self.routerHost + ':' + 443;
                         var triggerURL = host + '/api/v1/namespaces/' + triggerObj.namespace + '/triggers/' + triggerObj.name;
+                        var isIAMNamespace = doc.additionalData && doc.additionalData.iamApikey;
 
                         logger.info(method, 'Checking if trigger', triggerIdentifier, 'still exists');
                         self.authRequest(doc, {
                             method: 'get',
                             url: triggerURL
                         }, function (error, response) {
-                            if (!error && shouldDisableTrigger(response.statusCode, response.headers, true)) {
+                            if (!error && shouldDisableTrigger(response.statusCode, response.headers, isIAMNamespace)) {
                                 var message = 'Automatically disabled after receiving a ' + response.statusCode + ' status code on init trigger';
                                 disableTrigger(triggerIdentifier, response.statusCode, message);
                                 logger.error(method, 'trigger', triggerIdentifier, 'has been disabled due to status code:', response.statusCode);
-                            }
-                            else {
+                            } else {
                                 self.createTrigger(initTrigger(doc))
                                 .then(triggerIdentifier => {
                                     logger.info(method, triggerIdentifier, 'created successfully');
@@ -381,7 +374,7 @@ module.exports = function(logger, triggerDB, redisClient) {
             var feed = triggerDB.follow({
                 since: seq,
                 include_docs: true,
-                filter: filterDDName + '/' + triggersByWorker,
+                filter: constants.FILTERS_DESIGN_DOC + '/' + constants.TRIGGERS_BY_WORKER,
                 query_params: {worker: self.worker}
             });
 
@@ -393,8 +386,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                     if (doc.status && doc.status.active === false) {
                         deleteTrigger(triggerIdentifier);
                     }
-                }
-                else {
+                } else {
                     //ignore changes to disabled triggers
                     if (!doc.status || doc.status.active === true) {
                         self.createTrigger(initTrigger(doc))
@@ -415,13 +407,12 @@ module.exports = function(logger, triggerDB, redisClient) {
             });
 
             feed.follow();
-        }
-        catch (err) {
+        } catch (err) {
             logger.error(method, err);
         }
     }
 
-    this.authorize = function(req, res, next) {
+    this.authorize = function (req, res, next) {
         var method = 'authorize';
 
         if (self.endpointAuth) {
@@ -447,13 +438,11 @@ module.exports = function(logger, triggerDB, redisClient) {
             var endpointAuth = self.endpointAuth.split(':');
             if (endpointAuth[0] === uuid && endpointAuth[1] === key) {
                 next();
-            }
-            else {
+            } else {
                 logger.warn(method, 'Invalid key');
                 return sendError(method, HttpStatus.UNAUTHORIZED, 'Invalid key', res);
             }
-        }
-        else {
+        } else {
             next();
         }
     };
@@ -463,25 +452,10 @@ module.exports = function(logger, triggerDB, redisClient) {
         res.status(code).json({error: message});
     }
 
-    function parseQName(qname, separator) {
-        var parsed = {};
-        var delimiter = separator || ':';
-        var defaultNamespace = '_';
-        if (qname && qname.charAt(0) === delimiter) {
-            var parts = qname.split(delimiter);
-            parsed.namespace = parts[1];
-            parsed.name = parts.length > 2 ? parts.slice(2).join(delimiter) : '';
-        } else {
-            parsed.namespace = defaultNamespace;
-            parsed.name = qname;
-        }
-        return parsed;
-    }
-
-    this.initRedis = function() {
+    this.initRedis = function () {
         var method = 'initRedis';
 
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
 
             if (redisClient) {
                 var subscriber = redisClient.duplicate();
@@ -521,8 +495,7 @@ module.exports = function(logger, triggerDB, redisClient) {
                 .catch(err => {
                     reject(err);
                 });
-            }
-            else {
+            } else {
                 resolve();
             }
         });
@@ -535,14 +508,13 @@ module.exports = function(logger, triggerDB, redisClient) {
             //initialize redis key with active host
             logger.info(method, 'redis hset', self.redisKey, self.redisField, self.activeHost);
             return redisClient.hsetAsync(self.redisKey, self.redisField, self.activeHost);
-        }
-        else {
+        } else {
             self.activeHost = activeHost;
             return Promise.resolve();
         }
     }
 
-    this.authRequest = function(triggerData, options, cb) {
+    this.authRequest = function (triggerData, options, cb) {
 
         authHandler.handleAuth(triggerData, options)
         .then(requestOptions => {
@@ -553,4 +525,18 @@ module.exports = function(logger, triggerDB, redisClient) {
         });
     };
 
+    function parseQName(qname, separator) {
+        var parsed = {};
+        var delimiter = separator || ':';
+        var defaultNamespace = '_';
+        if (qname && qname.charAt(0) === delimiter) {
+            var parts = qname.split(delimiter);
+            parsed.namespace = parts[1];
+            parsed.name = parts.length > 2 ? parts.slice(2).join(delimiter) : '';
+        } else {
+            parsed.namespace = defaultNamespace;
+            parsed.name = qname;
+        }
+        return parsed;
+    }
 };

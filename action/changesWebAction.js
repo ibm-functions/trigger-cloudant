@@ -27,11 +27,13 @@ function main(params) {
 
     var triggerParts = common.parseQName(params.triggerName);
     var triggerData = {
-        apikey: params.authKey,
         name: triggerParts.name,
         namespace: triggerParts.namespace,
         additionalData: common.constructObject(params.additionalData),
     };
+    if (!triggerData.additionalData || !triggerData.additionalData.iamApikey) {
+        triggerData.apikey = params.authKey;
+    }
     var triggerID = `:${triggerParts.namespace}:${triggerParts.name}`;
 
     var workers = params.workers instanceof Array ? params.workers : [];
@@ -59,16 +61,14 @@ function main(params) {
             if (typeof queryParams === 'string') {
                 try {
                     query_params = JSON.parse(params.query_params);
-                }
-                catch (e) {
+                } catch (e) {
                     return common.sendError(400, 'The query_params parameter cannot be parsed. Ensure it is valid JSON.');
                 }
             }
             if (query_params && typeof query_params !== 'object') {
                 return common.sendError(400, 'The query_params parameter is not a valid JSON Object');
             }
-        }
-        else if (params.query_params) {
+        } else if (params.query_params) {
             return common.sendError(400, 'The query_params parameter is only allowed if the filter parameter is defined');
         }
 
@@ -108,6 +108,13 @@ function main(params) {
             .then((worker) => {
                 console.log('trigger will be assigned to worker ' + worker);
                 newTrigger.worker = worker;
+                if (params.encryptedAuth) {
+                    if (!newTrigger.additionalData || !newTrigger.additionalData.iamApikey) {
+                        newTrigger.apikey = params.encryptedAuth;
+                    } else {
+                        newTrigger.additionalData.iamApikey = params.encryptedAuth;
+                    }
+                }
                 return db.createTrigger(triggerID, newTrigger);
             })
             .then(() => {
@@ -122,8 +129,7 @@ function main(params) {
             });
         });
 
-    }
-    else if (params.__ow_method === "get") {
+    } else if (params.__ow_method === "get") {
         return new Promise(function (resolve, reject) {
             common.verifyTriggerAuth(triggerData, false)
             .then(() => {
@@ -164,8 +170,7 @@ function main(params) {
                 reject(err);
             });
         });
-    }
-    else if (params.__ow_method === "put") {
+    } else if (params.__ow_method === "put") {
 
         return new Promise(function (resolve, reject) {
             var updatedParams = {};
@@ -179,8 +184,7 @@ function main(params) {
                 if (params.filter || params.query_params) {
                     updatedParams.filter = trigger.filter;
                     updatedParams.query_params = trigger.query_params;
-                }
-                else {
+                } else {
                     return reject(common.sendError(400, 'At least one of filter or query_params parameters must be supplied'));
                 }
 
@@ -194,8 +198,7 @@ function main(params) {
                         if (typeof query_params === 'string') {
                             try {
                                 query_params = JSON.parse(params.query_params);
-                            }
-                            catch (e) {
+                            } catch (e) {
                                 return reject(common.sendError(400, 'The query_params parameter cannot be parsed. Ensure it is valid JSON.'));
                             }
                         }
@@ -203,8 +206,7 @@ function main(params) {
                             return reject(common.sendError(400, 'The query_params parameter is not a valid JSON Object'));
                         }
                         updatedParams.query_params = query_params;
-                    }
-                    else {
+                    } else {
                         return reject(common.sendError(400, 'The query_params parameter is only allowed if the filter parameter is defined'));
                     }
                 }
@@ -227,8 +229,7 @@ function main(params) {
                 reject(err);
             });
         });
-    }
-    else if (params.__ow_method === "delete") {
+    } else if (params.__ow_method === "delete") {
 
         return new Promise(function (resolve, reject) {
             common.verifyTriggerAuth(triggerData, true)
@@ -253,8 +254,7 @@ function main(params) {
                 reject(err);
             });
         });
-    }
-    else {
+    } else {
         return common.sendError(400, 'unsupported lifecycleEvent');
     }
 }
@@ -269,9 +269,11 @@ function verifyUserDB(triggerObj) {
         if (triggerObj.port) {
             dbURL += ':' + triggerObj.port;
         }
-        cloudant = new Cloudant({ url: dbURL, plugins: { iamauth: { iamApiKey: triggerObj.iamApiKey, iamTokenUrl: triggerObj.iamUrl } } });
-    }
-    else {
+        cloudant = new Cloudant({
+            url: dbURL,
+            plugins: {iamauth: {iamApiKey: triggerObj.iamApiKey, iamTokenUrl: triggerObj.iamUrl}}
+        });
+    } else {
         var url = `${triggerObj.protocol}://${triggerObj.user}:${triggerObj.pass}@${triggerObj.host}`;
         if (triggerObj.port) {
             url += ':' + triggerObj.port;
@@ -279,19 +281,17 @@ function verifyUserDB(triggerObj) {
         cloudant = Cloudant(url);
     }
 
-    return new Promise(function(resolve, reject) {
+    return new Promise(function (resolve, reject) {
         try {
             var userDB = cloudant.use(triggerObj.dbname);
-            userDB.info(function(err, body) {
+            userDB.info(function (err, body) {
                 if (!err) {
                     resolve();
-                }
-                else {
+                } else {
                     reject(common.sendError(err.statusCode, 'error connecting to database ' + triggerObj.dbname, err.message));
                 }
             });
-        }
-        catch(err) {
+        } catch (err) {
             reject(common.sendError(400, 'error connecting to database ' + triggerObj.dbname, err.message));
         }
 

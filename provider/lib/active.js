@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-module.exports = function(logger, manager) {
+module.exports = function (logger, manager) {
 
     // Active Endpoint
     this.endPoint = '/active';
 
     var hostMachine = process.env.HOST_MACHINE;
 
-    this.active = function(req, res) {
+    this.active = function (req, res) {
         var method = 'active';
 
         var response = {
@@ -56,8 +56,7 @@ module.exports = function(logger, manager) {
                         response.error = err;
                         res.send(response);
                     });
-                }
-                else {
+                } else {
                     response.active = manager.host === activeHost;
                     manager.activeHost = activeHost;
                     var message = 'The active state has changed';
@@ -65,12 +64,10 @@ module.exports = function(logger, manager) {
                     response.message = message;
                     res.send(response);
                 }
-            }
-            else {
+            } else {
                 res.send(response);
             }
-        }
-        else {
+        } else {
             res.send(response);
         }
     };

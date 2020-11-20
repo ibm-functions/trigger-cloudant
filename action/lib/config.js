@@ -6,8 +6,7 @@ function getOpenWhiskConfig(triggerData) {
             iamUrl: triggerData.additionalData.iamUrl
         });
         return {ignore_certs: true, namespace: triggerData.namespace, auth_handler: tm};
-    }
-    else {
+    } else {
         return {ignore_certs: true, namespace: triggerData.namespace, api_key: triggerData.apikey};
     }
 }
@@ -27,8 +26,7 @@ function addAdditionalData(params) {
             if (!params.password) {
                 params.password = cloudantCreds.password;
             }
-        }
-        else if (!params.iamApiKey) {
+        } else if (!params.iamApiKey) {
             params.iamApiKey = cloudantCreds.apikey;
         }
     }
