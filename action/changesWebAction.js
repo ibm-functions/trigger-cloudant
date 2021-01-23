@@ -78,7 +78,6 @@ function main(params) {
             common.verifyTriggerAuth(triggerData, false)
             .then(() => {
                 db = new Database(params.DB_URL, params.DB_NAME);
-
                 newTrigger = {
                     id: triggerID,
                     host: params.host,
@@ -86,7 +85,6 @@ function main(params) {
                     protocol: params.protocol || 'https',
                     dbname: params.dbname,
                     user: params.username,
-                    pass: params.password,
                     apikey: triggerData.apikey,
                     since: params.since,
                     maxTriggers: params.maxTriggers || -1,
@@ -97,9 +95,14 @@ function main(params) {
                         'dateChanged': Date.now()
                     },
                     additionalData: triggerData.additionalData,
-                    iamApiKey: params.iamApiKey,
                     iamUrl: params.iamUrl || 'https://iam.bluemix.net/identity/token'
                 };
+
+                if (params.iamApiKey) {
+                    newTrigger.iamApiKey = params.iamApiKey
+                } else {
+                    newTrigger.pass = params.password;
+                }
                 return verifyUserDB(newTrigger);
             })
             .then(() => {
