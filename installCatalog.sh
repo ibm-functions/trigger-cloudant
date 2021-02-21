@@ -75,6 +75,11 @@ $WSK_CLI -i --apihost "$EDGEHOST" action update --kind "$ACTION_RUNTIME_VERSION"
 COMMAND=" -i --apihost $EDGEHOST package update --auth $AUTH --shared no cloudantWeb \
      -p DB_URL $DB_URL \
      -p DB_NAME $DB_NAME \
+     -p CRYPT_KEKI ${CRYPT_KEKI} \
+     -p CRYPT_KEK ${CRYPT_KEK} \
+     -p CRYPT_KEKIF ${CRYPT_KEKIF} \
+     -p CRYPT_KEKF ${CRYPT_KEKF} \
+     -p CRYPT_VERSION ${CRYPT_VERSION} \
      -p apihost $APIHOST"
 
 if [ -n "$WORKERS" ]; then

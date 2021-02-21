@@ -89,5 +89,6 @@ function decryptAuth(authDBString) {
 }
 
 module.exports = {
-    'handleAuth': handleAuth
+    'handleAuth': handleAuth,
+    'decryptAuth': decryptAuth
 };
