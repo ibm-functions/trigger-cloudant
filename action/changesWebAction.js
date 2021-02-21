@@ -18,6 +18,7 @@
 const moment = require('moment');
 const common = require('./lib/common');
 const Database = require('./lib/Database');
+const CryptoUtils = require('./lib/CryptoUtils');
 
 function main(params) {
 
@@ -118,6 +119,14 @@ function main(params) {
                         newTrigger.additionalData.iamApikey = params.encryptedAuth;
                     }
                 }
+                //encrypt the cloudant password
+                const crypto = new CryptoUtils(params.CRYPT_KEKI, params.CRYPT_KEK, params.CRYPT_KEKIF, params.CRYPT_KEKF, params.CRYPT_VERSION);
+                if (newTrigger.iamApiKey) {
+                    newTrigger.iamApiKey = crypto.encryptAuth(newTrigger.iamApiKey);
+                } else {
+                    newTrigger.pass = crypto.encryptAuth(newTrigger.pass);
+                }
+
                 return db.createTrigger(triggerID, newTrigger);
             })
             .then(() => {
@@ -140,6 +149,8 @@ function main(params) {
                 return db.getTrigger(triggerID);
             })
             .then(doc => {
+                //encrypt the cloudant password
+                const crypto = new CryptoUtils(params.CRYPT_KEKI, params.CRYPT_KEK, params.CRYPT_KEKIF, params.CRYPT_KEKF, params.CRYPT_VERSION);
                 var body = {
                     config: {
                         name: doc.id.split(':')[2],
@@ -149,11 +160,11 @@ function main(params) {
                         protocol: doc.protocol,
                         dbname: doc.dbname,
                         username: doc.user,
-                        password: doc.pass,
+                        password: crypto.decryptAuth(doc.pass),
                         since: doc.since,
                         filter: doc.filter,
                         query_params: doc.query_params,
-                        iamApiKey: doc.iamApiKey,
+                        iamApiKey: crypto.decryptAuth(doc.iamApiKey),
                         iamUrl: doc.iamUrl
                     },
                     status: {

@@ -124,7 +124,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             protocol: newTrigger.protocol || 'https',
             dbname: newTrigger.dbname,
             user: newTrigger.user,
-            pass: newTrigger.pass,
+            pass: authHandler.decryptAuth(newTrigger.pass),
             apikey: newTrigger.apikey,
             since: newTrigger.since || 'now',
             maxTriggers: maxTriggers,
@@ -132,7 +132,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             filter: newTrigger.filter,
             query_params: newTrigger.query_params,
             additionalData: newTrigger.additionalData,
-            iamApiKey: newTrigger.iamApiKey,
+            iamApiKey: authHandler.decryptAuth(newTrigger.iamApiKey),
             iamUrl: newTrigger.iamUrl
         };
     }
