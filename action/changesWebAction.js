@@ -18,7 +18,7 @@
 const moment = require('moment');
 const common = require('./lib/common');
 const Database = require('./lib/Database');
-const CryptoUtils = require('./lib/CryptoUtils.js');
+const CryptoUtils = require('./lib/CryptoUtils');
 
 function main(params) {
 
