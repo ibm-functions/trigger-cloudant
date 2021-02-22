@@ -22,6 +22,9 @@ const ALGORITHM_TAG_SIZE_16 = 16;
 
 module.exports = function (encryptKeyID, encryptKeyValue, encryptFallBackKeyID, encryptFallBackKeyValue, cryptVersion) {
 
+    this.encryptKeyValue = decodeKeyValue(encryptKeyValue);
+    this.encryptFallBackKeyValue = decodeKeyValue(encryptFallBackKeyValue);
+
     this.decryptAuth = function (authDBString) {
         if (authDBString) {
             let authDBStringArray = authDBString.split('::');
@@ -32,9 +35,9 @@ module.exports = function (encryptKeyID, encryptKeyValue, encryptFallBackKeyID, 
                 let cryptVersionID = authDBStringArray[2];
                 let base64NonceAndCiphertext = authDBStringArray[3];
                 if (cryptVersionID === encryptKeyID) {
-                    keyValue = encryptKeyValue;
+                    keyValue = this.encryptKeyValue;
                 } else if (cryptVersionID === encryptFallBackKeyID) {
-                    keyValue = encryptFallBackKeyValue
+                    keyValue = this.encryptFallBackKeyValue
                 } else {
                     return "";
                 }
@@ -59,15 +62,15 @@ module.exports = function (encryptKeyID, encryptKeyValue, encryptFallBackKeyID, 
 
     this.encryptAuth = function (password) {
         if (encryptKeyID) {
-            return `::${cryptVersion}::${encryptKeyID}::${this.encryptPassword(password, encryptKeyValue)}`;
+            return `::${cryptVersion}::${encryptKeyID}::${encryptPassword(password, this.encryptKeyValue)}`;
         } else if (encryptFallBackKeyID) {
-            return `::${cryptVersion}::${encryptFallBackKeyID}::${this.encryptPassword(password, encryptFallBackKeyValue)}`;
+            return `::${cryptVersion}::${encryptFallBackKeyID}::${encryptPassword(password, this.encryptFallBackKeyValue)}`;
         } else {
             return password;
         }
     };
 
-    this.encryptPassword = function (password, keyValue) {
+    function encryptPassword(password, keyValue) {
         // generate a 96-bit cipher
         let nonce = crypto.randomBytes(ALGORITHM_NONCE_SIZE_12);
         // create the cipher instance
@@ -77,6 +80,13 @@ module.exports = function (encryptKeyID, encryptKeyValue, encryptFallBackKeyID, 
         let nonceAndCiphertext = Buffer.concat([nonce, ciphertext, cipher.getAuthTag()]);
         // return base64 encoded AES encrypted string
         return nonceAndCiphertext.toString("base64");
-    };
+    }
+
+    function decodeKeyValue(keyValue) {
+        // Create a buffer from the string
+        let bufferObj = Buffer.from(keyValue, "base64");
+        // Encode the Buffer as a utf8 string
+        return bufferObj.toString("utf8");
+    }
 
 };
