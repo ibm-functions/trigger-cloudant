@@ -23,11 +23,6 @@ DB_NAME="${4}cloudanttrigger"
 APIHOST="$5"
 WORKERS="$6"
 ACTION_RUNTIME_VERSION=${ACTION_RUNTIME_VERSION:="nodejs:10"}
-CRYPT_KEKI=${CRYPT_KEKI:=""}
-CRYPT_KEK=${CRYPT_KEK:=""}
-CRYPT_KEKIF=${CRYPT_KEKIF:=""}
-CRYPT_KEKF=${CRYPT_KEKF:=""}
-CRYPT_VERSION=${CRYPT_VERSION:=""}
 
 # If the auth key file exists, read the key in the file. Otherwise, take the
 # first argument as the key itself.
@@ -80,15 +75,21 @@ $WSK_CLI -i --apihost "$EDGEHOST" action update --kind "$ACTION_RUNTIME_VERSION"
 COMMAND=" -i --apihost $EDGEHOST package update --auth $AUTH --shared no cloudantWeb \
      -p DB_URL $DB_URL \
      -p DB_NAME $DB_NAME \
-     -p CRYPT_KEKI $CRYPT_KEKI \
-     -p CRYPT_KEK $CRYPT_KEK \
-     -p CRYPT_KEKIF $CRYPT_KEKIF \
-     -p CRYPT_KEKF $CRYPT_KEKF \
      -p CRYPT_VERSION $CRYPT_VERSION \
      -p apihost $APIHOST"
 
 if [ -n "$WORKERS" ]; then
     COMMAND+=" -p workers $WORKERS"
+fi
+
+if [ -n "$CRYPT_KEKI" ]; then
+    COMMAND+=" -p CRYPT_KEKI $CRYPT_KEKI"
+    COMMAND+=" -p CRYPT_KEK $CRYPT_KEK"
+fi
+
+if [ -n "$CRYPT_KEKIF" ]; then
+    COMMAND+=" -p CRYPT_KEKIF $CRYPT_KEKIF"
+    COMMAND+=" -p CRYPT_KEKF $CRYPT_KEKF"
 fi
 
 $WSK_CLI $COMMAND
