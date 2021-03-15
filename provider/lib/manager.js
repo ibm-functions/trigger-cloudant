@@ -90,6 +90,14 @@ module.exports = function (logger, triggerDB, redisClient) {
                 }
             });
 
+            feed.on('timeout', function (info) {
+                logger.info(method, 'Got timeout for', triggerData.id, 'from follow library:', JSON.stringify(info));
+            });
+
+            feed.on('retry', function (info) {
+                logger.info(method, 'Attempting retry for', triggerData.id, 'in follow library:', JSON.stringify(info));
+            });
+
             feed.follow();
 
             return new Promise(function (resolve, reject) {
