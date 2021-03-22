@@ -27,6 +27,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 
     this.triggers = {};
     this.endpointAuth = process.env.ENDPOINT_AUTH;
+    this.exitOnTimeout = process.env.EXIT_ON_TIMEOUT || 'false';
     this.routerHost = process.env.ROUTER_HOST || 'localhost';
     this.worker = process.env.WORKER || 'worker0';
     this.host = process.env.HOST_INDEX || 'host0';
@@ -103,7 +104,11 @@ module.exports = function (logger, triggerDB, redisClient) {
             return new Promise(function (resolve, reject) {
                 feed.on('error', function (err) {
                     logger.error(method, 'Error occurred for trigger', triggerData.id, '(db ' + triggerData.dbname + '):', err);
-                    reject(err);
+                    if (self.exitOnTimeout === 'true' && err.indexOf('Timeout confirming database') !== -1) {
+                        process.exit(1);
+                    } else {
+                        reject(err);
+                    }
                 });
 
                 feed.on('confirm', function () {
