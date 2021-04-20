@@ -103,7 +103,7 @@ module.exports = function (logger, manager) {
         .then(info => {
             logger.info(method, triggerID, info);
             var newTrigger = createCloudantTrigger(triggerID, apikey);
-            manager.createTrigger(newTrigger);
+            manager.createTrigger(newTrigger, false);
             setTimeout(function () {
                 var canaryDoc = {
                     isCanaryDoc: true,

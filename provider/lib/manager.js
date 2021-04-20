@@ -27,7 +27,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 
     this.triggers = {};
     this.endpointAuth = process.env.ENDPOINT_AUTH;
-    this.exitOnTimeout = process.env.EXIT_ON_TIMEOUT || 'false';
+    this.exitOnDBError = process.env.EXIT_ON_DB_ERROR || 'false';
     this.routerHost = process.env.ROUTER_HOST || 'localhost';
     this.worker = process.env.WORKER || 'worker0';
     this.host = process.env.HOST_INDEX || 'host0';
@@ -41,7 +41,7 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.monitorStatus = {};
 
     // Add a trigger: listen for changes and dispatch.
-    this.createTrigger = function (triggerData) {
+    this.createTrigger = function (triggerData, isStartup) {
         var method = 'createTrigger';
 
         var Cloudant = require('@cloudant/cloudant');
@@ -104,7 +104,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             return new Promise(function (resolve, reject) {
                 feed.on('error', function (err) {
                     logger.error(method, 'Error occurred for trigger', triggerData.id, '(db ' + triggerData.dbname + '):', err);
-                    if (self.exitOnTimeout === 'true' && err.indexOf('Timeout confirming database') !== -1) {
+                    if (self.exitOnDBError === 'true' && isStartup) {
                         process.exit(1);
                     } else {
                         reject(err);
@@ -361,7 +361,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                 disableTrigger(triggerIdentifier, response.statusCode, message);
                                 logger.error(method, 'trigger', triggerIdentifier, 'has been disabled due to status code:', response.statusCode);
                             } else {
-                                self.createTrigger(initTrigger(doc))
+                                self.createTrigger(initTrigger(doc), true)
                                 .then(triggerIdentifier => {
                                     logger.info(method, triggerIdentifier, 'created successfully');
                                 })
@@ -402,7 +402,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                 } else {
                     //ignore changes to disabled triggers
                     if (!doc.status || doc.status.active === true) {
-                        self.createTrigger(initTrigger(doc))
+                        self.createTrigger(initTrigger(doc),false)
                         .then(triggerIdentifier => {
                             logger.info(method, triggerIdentifier, 'created successfully');
                         })
