@@ -275,8 +275,42 @@ module.exports = function (logger, triggerDB, redisClient) {
                             reject(`Disabled trigger ${triggerIdentifier}: ${errMsg}`);
                         } else {
                             if (retryCount < constants.RETRY_ATTEMPTS) {
-                                var timeout = statusCode === 429 && retryCount === 0 ? 60000 : 1000 * Math.pow(retryCount + 1, 2);
+                                //**************************************************************************************
+                                //* Special handling for reaching Namespace limits for this trigger  ( if Pause/Resume Flag is enabled)
+                                //* - if limit reached ( statusCode == 429 ) then pause the reading events
+                                //*   from customer cloudant DB and do retry every 5 seconds to fire pending trigger 
+                                //*   and schedule  a  feed.resume() to run in 120 sec to restart reading events 
+                                //***************************************************************************************
+                                var timeout = 1000;  //default 
+                                if ( statusCode === 429 && self.pauseResumeEnabled == "true" ) {
+                                    timeout = 5000;
+                                    try {
+                                      triggerdata.feed.pause();  
+                                      logger.info(method, 'Paused receiving events for trigger:', triggerIdentifier, ' issued while Retry Count:', (retryCount + 1));    
+                                      //********************************************************************
+                                      //* schedule the asynchronous function in 120 sec resuming the feed  
+                                      //* to continue reading cloudant db changes events 
+                                      //******************************************************************** 
+                                      setTimeout(function () {
+                                        try {                                           
+                                          triggerdata.feed.resume(); 
+                                          logger.info(method, 'Resumed receiving events for trigger:', triggerIdentifier, 'issued while Retry Count:', (retryCount + 1));
+                                        } catch (err) {
+                                          logger.info(method, 'Failed on Resume the feed. Error: ', err );  
+                                          //** continue processing without pausing/resuming this trigger
+                                        }       
+                                      }, 120000);
+                                    } catch (err) {
+                                      logger.info(method, 'Failed on Pause the feed. Error: ', err );  
+                                      //** continue processing without pausing/resuming this trigger
+                                    }  
+                                }else statusCode === 429 && self.pauseResumeEnabled != "true" && retryCount === 0 ) {
+                                    timeout = 60000;
+                                }else{
+                                    timeout =  1000 * Math.pow(retryCount + 1, 2);
+                                }
                                 logger.info(method, 'Attempting to fire trigger again', triggerIdentifier, 'Retry Count:', (retryCount + 1));
+                                
                                 setTimeout(function () {
                                     postTrigger(triggerData, form, uri, (retryCount + 1))
                                     .then(triggerId => {
