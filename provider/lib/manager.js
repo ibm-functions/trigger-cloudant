@@ -304,7 +304,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                       logger.info(method, 'Failed on Pause the feed. Error: ', err );  
                                       //** continue processing without pausing/resuming this trigger
                                     }  
-                                }else ( statusCode === 429 && self.pauseResumeEnabled != "true" && retryCount === 0 ) {
+                                }else if ( statusCode === 429 && self.pauseResumeEnabled != "true" && retryCount === 0 ) { 
                                     timeout = 60000;
                                 }else{
                                     timeout =  1000 * Math.pow(retryCount + 1, 2);
