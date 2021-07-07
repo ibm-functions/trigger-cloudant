@@ -29,7 +29,7 @@ var logger = require('./Logger');
 
 var ProviderManager = require('./lib/manager.js');
 var ProviderHealth = require('./lib/health.js');
-var ProviderHealth = require('./lib/health.js');
+var ProviderActivation = require('./lib/active.js');
 var ProviderPauseResume = require('./lib/pauseResume.js');
 var constants = require('./lib/constants.js');
 
