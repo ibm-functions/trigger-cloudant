@@ -285,7 +285,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                 if ( statusCode === 429 && self.pauseResumeEnabled == "true" ) {
                                     timeout = 5000;
                                     try {
-                                      triggerdata.feed.pause();  
+                                      triggerData.feed.pause();  
                                       logger.info(method, 'Paused receiving events for trigger:', triggerIdentifier, ' issued while Retry Count:', (retryCount + 1));    
                                       //********************************************************************
                                       //* schedule the asynchronous function in 120 sec resuming the feed  
@@ -293,7 +293,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                       //******************************************************************** 
                                       setTimeout(function () {
                                         try {                                           
-                                          triggerdata.feed.resume(); 
+                                          triggerData.feed.resume(); 
                                           logger.info(method, 'Resumed receiving events for trigger:', triggerIdentifier, 'issued while Retry Count:', (retryCount + 1));
                                         } catch (err) {
                                           logger.info(method, 'Failed on Resume the feed. Error: ', err );  
