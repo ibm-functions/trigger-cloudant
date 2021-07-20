@@ -48,12 +48,12 @@ module.exports = function (logger, manager) {
                 enabled: "false"
             });
         }else if ( req.query.enabled.length == 0 ){
-            logger.info( method, 'Pause/Resume capability status queried by operator');
+            logger.error( method, 'Pause/Resume capability status queried by operator');
             res.send({
                 enabled: manager.pauseResumeEnabled
             });
         }else {
-            logger.info( method, 'Request to change Pause/Resume capability contained incorrect arguments');
+            logger.error( method, 'Request to change Pause/Resume capability contained incorrect arguments');
             res.status(400).send({
                 message: 'Missing  parameter [/pauseresume?enabled=] in URL'
             });
