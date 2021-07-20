@@ -11,7 +11,7 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
+ * See the License for the specific language governing permissions and 
  * limitations under the License.
  */
 
@@ -39,6 +39,7 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.redisField = constants.REDIS_FIELD;
     this.uriHost = 'https://' + this.routerHost;
     this.monitorStatus = {};
+    this.pauseResumeEnabled = "false";   //* By default it is switched OFF
 
     // Add a trigger: listen for changes and dispatch.
     this.createTrigger = function (triggerData, isStartup) {
@@ -274,8 +275,48 @@ module.exports = function (logger, triggerDB, redisClient) {
                             reject(`Disabled trigger ${triggerIdentifier}: ${errMsg}`);
                         } else {
                             if (retryCount < constants.RETRY_ATTEMPTS) {
-                                var timeout = statusCode === 429 && retryCount === 0 ? 60000 : 1000 * Math.pow(retryCount + 1, 2);
+                                //**************************************************************************************
+                                //* Special handling for reaching Namespace limits for this trigger  ( if Pause/Resume Flag is enabled)
+                                //* - if limit reached ( statusCode == 429 ) then pause the reading events
+                                //*   from customer cloudant DB and do retry every 5 seconds to fire pending trigger 
+                                //*   and schedule  a  feed.resume() to run in 120 sec to restart reading events 
+                                //***************************************************************************************
+                                var timeout = 1000;  //default 
+                                if ( statusCode === 429 && self.pauseResumeEnabled == "true" ) {
+                                    timeout = 6000;
+                                    try {
+                                      triggerData.feed.pause();  
+                                      logger.info(method, 'Paused receiving events for trigger:', triggerIdentifier, ' issued while Retry Count:', (retryCount + 1));    
+                                      //********************************************************************
+                                      //* schedule the asynchronous function in 120 sec resuming the feed  
+                                      //* to continue reading cloudant db changes events 
+                                      //******************************************************************** 
+                                      setTimeout(function () {
+                                        try {                                           
+                                          triggerData.feed.resume(); 
+                                          logger.info(method, 'Resumed receiving events for trigger:', triggerIdentifier, 'issued while Retry Count:', (retryCount + 1));
+                                        } catch (err) {
+                                          logger.error(method, 'Failed on Resume the feed. Error: ', err );  
+                                          //** continue processing without pausing/resuming this trigger
+                                        }       
+                                      }, 120000);
+                                    } catch (err) {
+                                      logger.error(method, 'Failed on Pause the feed. Error: ', err );  
+                                      //** continue processing without pausing/resuming this trigger
+                                    }  
+                                }else if ( statusCode === 429 && self.pauseResumeEnabled != "true" && retryCount === 0 ) { 
+                                    timeout = 60000;
+                                }else if ( statusCode === 429 && self.pauseResumeEnabled != "true" ) { 
+                                    //*********************************************************************
+                                    //* exponential handling of timeouts for retries has no effect on reaching 
+                                    //* limits. -> so use a  fix value for timeout 
+                                    //********************************************************************** 
+                                    timeout = 6000;
+                                }else{
+                                    timeout =  1000 * Math.pow(retryCount + 1, 2);
+                                }
                                 logger.info(method, 'Attempting to fire trigger again', triggerIdentifier, 'Retry Count:', (retryCount + 1));
+                                
                                 setTimeout(function () {
                                     postTrigger(triggerData, form, uri, (retryCount + 1))
                                     .then(triggerId => {

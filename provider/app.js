@@ -30,6 +30,7 @@ var logger = require('./Logger');
 var ProviderManager = require('./lib/manager.js');
 var ProviderHealth = require('./lib/health.js');
 var ProviderActivation = require('./lib/active.js');
+var ProviderPauseResume = require('./lib/pauseResume.js');
 var constants = require('./lib/constants.js');
 
 // Initialize the Express Application
@@ -141,12 +142,17 @@ function init(server) {
     .then(() => {
         var providerHealth = new ProviderHealth(logger, providerManager);
         var providerActivation = new ProviderActivation(logger, providerManager);
+        var providerPauseResume = new ProviderPauseResume(logger, providerManager);
 
         // Health Endpoint
         app.get(providerHealth.endPoint, providerManager.authorize, providerHealth.health);
 
         // Activation Endpoint
         app.get(providerActivation.endPoint, providerManager.authorize, providerActivation.active);
+        
+        // PauseResume Endpoint
+        app.get(providerPauseResume.endPoint, providerManager.authorize, providerPauseResume.pauseresume);
+
 
         providerManager.initAllTriggers();
 
