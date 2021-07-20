@@ -296,23 +296,24 @@ module.exports = function (logger, triggerDB, redisClient) {
                                           triggerData.feed.resume(); 
                                           logger.info(method, 'Resumed receiving events for trigger:', triggerIdentifier, 'issued while Retry Count:', (retryCount + 1));
                                         } catch (err) {
-                                          logger.info(method, 'Failed on Resume the feed. Error: ', err );  
+                                          logger.error(method, 'Failed on Resume the feed. Error: ', err );  
                                           //** continue processing without pausing/resuming this trigger
                                         }       
                                       }, 120000);
                                     } catch (err) {
-                                      logger.info(method, 'Failed on Pause the feed. Error: ', err );  
+                                      logger.error(method, 'Failed on Pause the feed. Error: ', err );  
                                       //** continue processing without pausing/resuming this trigger
                                     }  
                                 }else if ( statusCode === 429 && self.pauseResumeEnabled != "true" && retryCount === 0 ) { 
                                     timeout = 60000;
-                                }else{
+                                }else if ( statusCode === 429 && self.pauseResumeEnabled != "true" ) { 
                                     //*********************************************************************
                                     //* exponential handling of timeouts for retries has no effect on reaching 
                                     //* limits. -> so use a  fix value for timeout 
-                                    //**********************************************************************
-                                    //timeout =  1000 * Math.pow(retryCount + 1, 2);
+                                    //********************************************************************** 
                                     timeout = 6000;
+                                }else{
+                                    timeout =  1000 * Math.pow(retryCount + 1, 2);
                                 }
                                 logger.info(method, 'Attempting to fire trigger again', triggerIdentifier, 'Retry Count:', (retryCount + 1));
                                 
