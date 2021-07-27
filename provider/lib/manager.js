@@ -570,7 +570,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 
     this.authRequest = function (triggerData, options, cb) {
 
-        authHandler.handleAuth(triggerData, options)
+        authHandler.handleAuth(triggerData, logger, options)
         .then(requestOptions => {
             request(requestOptions, cb);
         })

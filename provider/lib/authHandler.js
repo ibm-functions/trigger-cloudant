@@ -9,16 +9,20 @@ const encryptFallBackKeyValue = process.env.CONFIG_WHISK_CRYPT_KEKF
 
 var tokenManagers = {};
 
-function handleAuth(triggerData, options) {
+function handleAuth(triggerData, logger, options) {
 
+    var method = 'handleAuth';
+    
     if (triggerData.additionalData && triggerData.additionalData.iamApikey) {
         return new Promise(function (resolve, reject) {
             getToken(triggerData)
             .then(token => {
                 options.auth = {bearer: token};
+                logger.info(method, 'Received a valid token to send HTTP request to openwhisk for trigger: ', triggerData.id)
                 resolve(options);
             })
             .catch(err => {
+               logger.error(method, 'Error while receiving a token to send HTTP request to openwhisk');
                reject(err);
             });
         });
