@@ -39,7 +39,7 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.redisField = constants.REDIS_FIELD;
     this.uriHost = 'https://' + this.routerHost;
     this.monitorStatus = {};
-    this.pauseResumeEnabled = "false";   //* By default it is switched OFF
+    this.pauseResumeEnabled = "true";   //* By default it is switched OFF
 
     // Add a trigger: listen for changes and dispatch.
     this.createTrigger = function (triggerData, isStartup) {
@@ -570,7 +570,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 
     this.authRequest = function (triggerData, options, cb) {
 
-        authHandler.handleAuth(triggerData, options)
+        authHandler.handleAuth(triggerData, logger, options)
         .then(requestOptions => {
             request(requestOptions, cb);
         })

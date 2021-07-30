@@ -48,7 +48,7 @@ module.exports = function (logger, manager) {
                 enabled: "false"
             });
         }else if ( req.query.enabled.length == 0 ){
-            logger.error( method, 'Pause/Resume capability status queried by operator');
+            logger.info( method, 'Pause/Resume capability status queried by operator');
             res.send({
                 enabled: manager.pauseResumeEnabled
             });
