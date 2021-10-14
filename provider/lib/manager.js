@@ -40,7 +40,20 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.uriHost = 'https://' + this.routerHost;
     this.monitorStatus = {};
     this.pauseResumeEnabled = "true";   //* By default it is switched OFF
-
+    this.healthObject; 
+    
+    //****************************************************
+    //* Registering of Health object which can be used 
+    //* to update the self-test monitor status whenever 
+    //* is needed 
+    //****************************************************
+    this.registerHealthObject = function (healthObj) {
+        var method = 'registerect'; 
+        
+        this.healthObject = healthObj
+    
+    };
+    
     // Add a trigger: listen for changes and dispatch.
     this.createTrigger = function (triggerData, isStartup) {
         var method = 'createTrigger';
@@ -83,7 +96,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             feed.on('change', function (change) {
                 var triggerHandle = self.triggers[triggerData.id];
                 if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
-                    logger.info(method, 'Trigger', triggerData.id, 'got change from', triggerData.dbname);
+                    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname);
                     try {
                         fireTrigger(triggerData.id, change);
                     } catch (e) {
@@ -93,15 +106,43 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
 
             feed.on('timeout', function (info) {
-                logger.info(method, 'Got timeout for', triggerData.id, 'from follow library:', JSON.stringify(info));
+                logger.info(method, 'Got timeout for', triggerData.id, 'from follow library for customer DB:', JSON.stringify(info));
             });
 
             feed.on('retry', function (info) {
-                logger.info(method, 'Attempting retry for', triggerData.id, 'in follow library:', JSON.stringify(info));
+                logger.info(method, 'Attempting retry for', triggerData.id, 'in follow library for customer DB:', JSON.stringify(info));
             });
 
+            feed.on('stop', function () {
+                logger.error(method, "Cloudant provider stop change listening socket to customer DB for trigger:",  triggerData.id );
+            });
+            
             feed.follow();
 
+            //**********************************************************
+            //* additional feed listeners for logging purpose to get info 
+            //* about DB change listener socket to customer DB 
+            //***********************************************************
+            feed.on('confirm_request', function (req) {
+                logger.info(method, 'Cloudant provider establish change listen socket to customer db for trigger: ', triggerData.id );
+            });
+            
+            feed.on('confirm', function () {
+                logger.info(method, 'Cloudant provider starts listening for changes on customer db for trigger: ', triggerData.id );
+            });
+            
+            feed.on('timeout', function (info) {
+                logger.info(method, 'Got timeout while listening changes on customer database for trigger:', triggerData.id, ' : ', JSON.stringify(info));
+            });
+            
+            feed.on('catchup', function (seq_id) {
+                logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
+            });
+            
+            feed.on('retry', function (info) {
+                logger.info(method, 'Follow lib retries to establish listening changes socket to customer database ( for trigger  ', triggerData.id,' ) : ', JSON.stringify(info));
+            });
+            
             return new Promise(function (resolve, reject) {
                 feed.on('error', function (err) {
                     logger.error(method, 'Error occurred for trigger', triggerData.id, '(db ' + triggerData.dbname + '):', err);
@@ -113,7 +154,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                 });
 
                 feed.on('confirm', function () {
-                    logger.info(method, 'Added cloudant data trigger', triggerData.id, 'listening for changes in database', triggerData.dbname);
+                    logger.info(method, 'Added cloudant data trigger', triggerData.id, 'listening for changes in customer database', triggerData.dbname);
                     if (isMonitoringTrigger(triggerData.monitor, triggerData.id)) {
                         self.monitorStatus.triggerStarted = "success";
                     }
@@ -122,7 +163,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
 
         } catch (err) {
-            logger.info(method, 'caught an exception for trigger', triggerData.id, err);
+            logger.info(method, 'caught an exception in change listener to customer DB for trigger', triggerData.id, err);
             return Promise.reject(err);
         }
 
@@ -194,6 +235,14 @@ module.exports = function (logger, triggerDB, redisClient) {
 
             if (isMonitoringTrigger(monitorTrigger, triggerIdentifier)) {
                 self.monitorStatus.triggerStopped = "success";
+                if ( healthObject ) {
+                	//**************************************************
+                	//* trigger the health obj to pull the monitor status 
+                	//* of the successfully executed self-test trigger 
+                	//* immediately, instead of waiting next monitor() loop
+                	//***************************************************
+                	healthObject.updateMonitorStatus()
+                }
             }
         }
     }
@@ -456,11 +505,40 @@ module.exports = function (logger, triggerDB, redisClient) {
                 }
             });
 
+            feed.on('stop', function () {
+                logger.error(method, "Cloudant provider stop change listening socket to trigger configuration database");
+            });
+            
             feed.on('error', function (err) {
                 logger.error(method, err);
             });
 
             feed.follow();
+            
+            //**********************************************************
+            //* additional feed listeners for logging purpose to get info 
+            //* about DB change listener socket to trigger config DB 
+            //***********************************************************
+            feed.on('confirm_request', function (req) {
+                logger.info(method, 'Cloudant provider establish change listen socket to  trigger configuration database');
+            });
+            
+            feed.on('confirm', function () {
+                logger.info(method, 'Cloudant provider starts listening for changes in configuration database');
+            });
+            
+            feed.on('timeout', function (info) {
+                logger.info(method, 'Got timeout while listening changes in cloudant trigger configuration database:', JSON.stringify(info));
+            });
+            
+            feed.on('catchup', function (seq_id) {
+                logger.info(method, 'Cloudant providers listening changes sequences number adjusted to :', JSON.stringify(seq_id));
+            });
+            
+            feed.on('retry', function (info) {
+                logger.info(method, 'Follow lib retries to establish listening changes socket to cloudant trigger configuration database:', JSON.stringify(info));
+            });
+            
         } catch (err) {
             logger.error(method, err);
         }
