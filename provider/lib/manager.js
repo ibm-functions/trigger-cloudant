@@ -48,10 +48,10 @@ module.exports = function (logger, triggerDB, redisClient) {
     //* is needed 
     //****************************************************
     this.registerHealthObject = function (healthObj) {
-        var method = 'registerect'; 
+        var method = 'registerHealthObject'; 
         
-        this.healthObject = healthObj
-    
+        this.healthObject = healthObj;
+        logger.info(method, 'Health obj successfully registered ');    
     };
     
     // Add a trigger: listen for changes and dispatch.
@@ -114,7 +114,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
 
             feed.on('stop', function () {
-                logger.error(method, "Cloudant provider stop change listening socket to customer DB for trigger:",  triggerData.id );
+                logger.info(method, "Cloudant provider stop change listening socket to customer DB for trigger:",  triggerData.id );
             });
             
             feed.follow();
@@ -235,13 +235,13 @@ module.exports = function (logger, triggerDB, redisClient) {
 
             if (isMonitoringTrigger(monitorTrigger, triggerIdentifier)) {
                 self.monitorStatus.triggerStopped = "success";
-                if ( healthObject ) {
+                if ( self.healthObject ) {
                 	//**************************************************
                 	//* trigger the health obj to pull the monitor status 
                 	//* of the successfully executed self-test trigger 
                 	//* immediately, instead of waiting next monitor() loop
                 	//***************************************************
-                	healthObject.updateMonitorStatus()
+                	self.healthObject.updateMonitorStatus()
                 }
             }
         }
@@ -506,7 +506,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
 
             feed.on('stop', function () {
-                logger.error(method, "Cloudant provider stop change listening socket to trigger configuration database");
+                logger.info(method, "Cloudant provider stop change listening socket to trigger configuration database");
             });
             
             feed.on('error', function (err) {
