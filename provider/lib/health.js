@@ -92,8 +92,13 @@ module.exports = function (logger, manager) {
             };
             deleteTrigger(triggerData, 0);
 
-            //delete the canary doc
-            deleteDocFromDB(existingCanaryID, 0);
+            //delete the canary doc which resides in the trigger config db,  too 
+            //* delayed, so that it does not conflict with the next createTrigger of 
+            //* the subsequent next self-test trigger 
+            setTimeout(function () {
+            	deleteDocFromDB(existingCanaryID, 0);
+            }, 10000 );
+            
         }
 
         //create new cloudant trigger and canary doc
@@ -118,13 +123,35 @@ module.exports = function (logger, manager) {
                     host: manager.host
                 };
                 createDocInDB(canaryDocID, canaryDoc);
-            }, monitoringInterval / 3);
+            }, monitoringInterval / 10);
         })
         .catch(err => {
             logger.error(method, triggerID, err);
         });
     };
 
+    this.updateMonitorStatus = function () {
+        var method = 'updateMonitorStatus';
+
+        //*******************************************************************
+        //* copy the status of the self-test trigger from the manager
+        //* object into the health object, to have the status earlier 
+        //* then by waiting on the expiration of the waiting loop of the 
+        //* monitor() call 
+        //********************************************************************
+        if (triggerName) {
+            monitorStatus = Object.assign({}, manager.monitorStatus);
+            manager.monitorStatus = {};
+
+            var monitorStatusSize = Object.keys(monitorStatus).length;
+            if (monitorStatusSize < 5) {
+                //we have a failure in one of the stages
+                var stageFailed = monitorStages[monitorStatusSize - 2];
+                monitorStatus[stageFailed] = 'failed';
+            }
+        }
+    };
+    
     function createCloudantTrigger(triggerID, apikey) {
         var dbURL = new URL(manager.db.config.url);
         var dbName = manager.db.config.db;
@@ -158,9 +185,13 @@ module.exports = function (logger, manager) {
                 body: {}
             }, function (error, response) {
                 if (error || response.statusCode >= 400) {
-                    reject('monitoring trigger create request failed');
+                	if( error ) {
+                      reject('self-test trigger HTTP call to openWhisk failed with error = ',error );
+                	}else {
+                      reject('self-test trigger HTTP call to openWhisk failed with rc = ',response.statusCode );
+                	}
                 } else {
-                    resolve('monitoring trigger create request was successful');
+                    resolve('self-test trigger HTTP call to openWhisk was successful');
                 }
             });
         });

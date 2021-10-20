@@ -53,6 +53,9 @@ var databaseName = dbPrefix + constants.TRIGGER_DB_SUFFIX;
 var redisUrl = process.env.REDIS_URL;
 var monitoringAuth = process.env.MONITORING_AUTH;
 var monitoringInterval = process.env.MONITORING_INTERVAL || constants.MONITOR_INTERVAL;
+var firstMonitoringWaittime = Math.round(monitoringInterval / 5)
+
+
 
 // Create the Provider Server
 var server = http.createServer(app);
@@ -153,7 +156,25 @@ function init(server) {
         // PauseResume Endpoint
         app.get(providerPauseResume.endPoint, providerManager.authorize, providerPauseResume.pauseresume);
 
-
+        //*********************************************************
+        //* register health object, so that manager use it 
+        //*********************************************************
+        providerManager.registerHealthObject(providerHealth);
+        
+        
+        //*****************************************************************
+        //* Trigger a single self-test (monitor) run  immediately after 
+        //* starting the provider to ensure that monitoringService calls to 
+        //* the health endpoint will provide a result. 
+        //* - ca 1 min  delay to ensure that the providers asynchronous start handling 
+        //*   is completed 
+        //********************************************************************
+        if (monitoringAuth) {
+            setTimeout(function () {
+                providerHealth.monitor(monitoringAuth,monitoringInterval);
+            }, firstMonitoringWaittime );
+        }
+        
         providerManager.initAllTriggers();
 
         if (monitoringAuth) {
