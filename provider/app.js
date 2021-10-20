@@ -53,11 +53,7 @@ var databaseName = dbPrefix + constants.TRIGGER_DB_SUFFIX;
 var redisUrl = process.env.REDIS_URL;
 var monitoringAuth = process.env.MONITORING_AUTH;
 var monitoringInterval = process.env.MONITORING_INTERVAL || constants.MONITOR_INTERVAL;
-if ( monitoringInterval ) {
-	var firstMonitoringWaittime = Math.round(monitoringInterval / 5)
-} else {
-	var firstMonitoringWaittime = Math.round(constants.MONITOR_INTERVAL / 5)
-}
+var firstMonitoringWaittime = Math.round(monitoringInterval / 5)
 
 
 
