@@ -599,7 +599,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                 });
 
                 subscriber.on('error', function (err) {
-                    logger.error(method, 'Error connecting to redis', err);
+                    logger.error(method, 'Error connecting to redis while subscription', err);
                     reject(err);
                 });
 
@@ -636,7 +636,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                 self.redisClient.publish(self.redisKey, redundantHost);
                             })
                             .catch(err => {
-                                logger.error(method, err);
+                                logger.error(method,'Fail to process SIGTERM and inform redis', err);
                             });
                         }
                     });
@@ -646,6 +646,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                     reject(err);
                 });
             } else {
+            	logger.info(method, 'Running cloudant provider worker without redis connection (test mode) ');
                 resolve();
             }
         });
@@ -660,6 +661,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             return redisClient.hsetAsync(self.redisKey, self.redisField, self.activeHost);
         } else {
             self.activeHost = activeHost;
+            logger.info(method, 'start provider with activeHost = ',  self.activeHost);
             return Promise.resolve();
         }
     }
