@@ -607,7 +607,22 @@ module.exports = function (logger, triggerDB, redisClient) {
 
                 redisClient.hgetAsync(self.redisKey, self.redisField)
                 .then(activeHost => {
-                    return initActiveHost(activeHost);
+                	//************************************************
+                	//* Start regularly Redis synchronization, to recover
+                	//* from "Redis-Out-of-sync" situations (all 10 min) 
+                	//************************************************
+                	setInterval(function () {
+                   		logger.info(method, 'Redis synchronizer checks if [ ', self.activeHost, ' ] is still the valid one');
+                		redisClient.hgetAsync(self.redisKey, self.redisField)
+                        .then(activeHost => {
+                        	if ( activeHost != null && activeHost != "" && self.activeHost != activeHost ){
+                        		logger.info(method, 'Redis synchronizer updated active host to: ', activeHost);
+                        		self.activeHost = activeHost;
+                        	}
+                         })	
+                     }, 600000 );
+                    	
+                     return initActiveHost(activeHost);
                 })
                 .then(() => {
                     process.on('SIGTERM', function onSigterm() {
