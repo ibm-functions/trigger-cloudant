@@ -619,7 +619,10 @@ module.exports = function (logger, triggerDB, redisClient) {
                         		logger.info(method, 'Redis synchronizer updated active host to: ', activeHost);
                         		self.activeHost = activeHost;
                         	}
-                         })	
+                         })
+                         .catch(err => {
+                             logger.error(method, "Redis synchronizer regular run fails with :",  err);
+                         })
                      }, 600000 );
                     	
                      return initActiveHost(activeHost);
