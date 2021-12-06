@@ -101,10 +101,11 @@ module.exports = function (logger, triggerDB, redisClient) {
             	//* number of each change is tracked 
             	//******************************************************************
             	let seq_info = change.seq;
+            	let seq_nr = 0
             	if (seq_info == null || !seq_info.includes('-') ) {
              		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
             	}else{
-	                let seq_nr = seq_info.split('-')[0]; 
+	                seq_nr = seq_info.split('-')[0]; 
 	            	if ( seq_nr > triggerData.lastExecutedChangeSeqId ) {
 	            		triggerData.lastExecutedChangeSeqId = seq_nr;
 	            	    var triggerHandle = self.triggers[triggerData.id];
