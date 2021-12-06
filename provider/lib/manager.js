@@ -105,8 +105,8 @@ module.exports = function (logger, triggerDB, redisClient) {
              		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
             	}else{
 	                seq_nr = seq_info.split('-')[0]; 
-	            	if ( seq_nr > lastExecutedChangeSeqId ) {
-	            		lastExecutedChangeSeqId = seq_nr;
+	            	if ( seq_nr > triggerData.lastExecutedChangeSeqId ) {
+	            		triggerData.lastExecutedChangeSeqId = seq_nr;
 	            	    var triggerHandle = self.triggers[triggerData.id];
 	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr);
 	                    if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
@@ -156,7 +156,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             	seq_id_str =  JSON.stringify(seq_id);
             	// Simple check to do only an update only with a valid seq_number
             	if ( seq_id_str.includes('-') ) {
-            		lastExecutedChangeSeqId = seq_id_str.split('-')[0];
+            		triggerData.lastExecutedChangeSeqId = seq_id_str.split('-')[0];
             	}
             	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
             });
