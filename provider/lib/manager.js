@@ -100,11 +100,11 @@ module.exports = function (logger, triggerDB, redisClient) {
             	//* provider from fire triggers for these duplications the seq_id 
             	//* number of each change is tracked 
             	//******************************************************************
-            	seq_info = change.seq;
+            	let seq_info = change.seq;
             	if (seq_info == null || !seq_info.includes('-') ) {
              		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
             	}else{
-	                seq_nr = seq_info.split('-')[0]; 
+	                let seq_nr = seq_info.split('-')[0]; 
 	            	if ( seq_nr > triggerData.lastExecutedChangeSeqId ) {
 	            		triggerData.lastExecutedChangeSeqId = seq_nr;
 	            	    var triggerHandle = self.triggers[triggerData.id];
@@ -153,7 +153,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
             
             feed.on('catchup', function (seq_id) {
-            	seq_id_str =  JSON.stringify(seq_id);
+            	let seq_id_str =  JSON.stringify(seq_id);
             	// Simple check to do only an update only with a valid seq_number
             	if ( seq_id_str.includes('-') ) {
             		triggerData.lastExecutedChangeSeqId = seq_id_str.split('-')[0];
