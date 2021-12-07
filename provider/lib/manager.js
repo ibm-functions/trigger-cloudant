@@ -94,15 +94,33 @@ module.exports = function (logger, triggerDB, redisClient) {
             self.triggers[triggerData.id] = triggerData;
 
             feed.on('change', function (change) {
-                var triggerHandle = self.triggers[triggerData.id];
-                if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
-                    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname);
-                    try {
-                        fireTrigger(triggerData.id, change);
-                    } catch (e) {
-                        logger.error(method, 'Exception occurred while firing trigger', triggerData.id, e);
-                    }
-                }
+                //****************************************************************
+            	//* Cloundant DB changes tracking gets sometimes  duplicated Changes
+            	//* notified in case of "cloudant DB rewind" situation. To prevent the 
+            	//* provider from fire triggers for these duplications the seq_id 
+            	//* number of each change is tracked 
+            	//******************************************************************
+            	let seq_info = change.seq;
+            	let seq_nr = 0
+            	if (seq_info == null || !seq_info.includes('-') ) {
+             		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
+            	}else{
+	                seq_nr = seq_info.split('-')[0]; 
+	            	if ( seq_nr > triggerData.lastExecutedChangeSeqId ) {
+	            		triggerData.lastExecutedChangeSeqId = seq_nr;
+	            	    var triggerHandle = self.triggers[triggerData.id];
+	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr);
+	                    if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
+	                        try {
+	                            fireTrigger(triggerData.id, change);
+	                        } catch (e) {
+	                            logger.error(method, 'Exception occurred while firing trigger', triggerData.id, e);
+	                        }
+	                    }
+	            	}else{
+	            		logger.info(method, 'Trigger', triggerData.id, ' filtered out already executed change with seq_id = ',seq_nr);
+	            	}
+            	}	
             });
 
             feed.on('timeout', function (info) {
@@ -136,7 +154,12 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
             
             feed.on('catchup', function (seq_id) {
-                logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
+            	let seq_id_str =  JSON.stringify(seq_id);
+            	// Simple check to do only an update only with a valid seq_number
+            	if ( seq_id_str.includes('-') ) {
+            		triggerData.lastExecutedChangeSeqId = seq_id_str.split('-')[0];
+            	}
+            	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
             });
             
             feed.on('retry', function (info) {
@@ -188,7 +211,8 @@ module.exports = function (logger, triggerDB, redisClient) {
             query_params: newTrigger.query_params,
             additionalData: newTrigger.additionalData,
             iamApiKey: authHandler.decryptAuth(newTrigger.iamApiKey),
-            iamUrl: newTrigger.iamUrl
+            iamUrl: newTrigger.iamUrl,
+            lastExecutedChangeSeqId: -1
         };
     }
 
@@ -599,7 +623,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                 });
 
                 subscriber.on('error', function (err) {
-                    logger.error(method, 'Error connecting to redis', err);
+                    logger.error(method, 'Error connecting to redis while subscription', err);
                     reject(err);
                 });
 
@@ -636,7 +660,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                 self.redisClient.publish(self.redisKey, redundantHost);
                             })
                             .catch(err => {
-                                logger.error(method, err);
+                                logger.error(method,'Fail to process SIGTERM and inform redis', err);
                             });
                         }
                     });
@@ -646,6 +670,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                     reject(err);
                 });
             } else {
+            	logger.info(method, 'Running cloudant provider worker without redis connection (test mode) ');
                 resolve();
             }
         });
@@ -660,6 +685,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             return redisClient.hsetAsync(self.redisKey, self.redisField, self.activeHost);
         } else {
             self.activeHost = activeHost;
+            logger.info(method, 'start provider with activeHost = ',  self.activeHost);
             return Promise.resolve();
         }
     }

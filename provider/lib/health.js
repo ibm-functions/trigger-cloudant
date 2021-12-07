@@ -141,8 +141,7 @@ module.exports = function (logger, manager) {
         //********************************************************************
         if (triggerName) {
             monitorStatus = Object.assign({}, manager.monitorStatus);
-            manager.monitorStatus = {};
-
+            
             var monitorStatusSize = Object.keys(monitorStatus).length;
             if (monitorStatusSize < 5) {
                 //we have a failure in one of the stages
