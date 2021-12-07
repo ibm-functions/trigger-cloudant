@@ -212,7 +212,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             additionalData: newTrigger.additionalData,
             iamApiKey: authHandler.decryptAuth(newTrigger.iamApiKey),
             iamUrl: newTrigger.iamUrl,
-            lastExecutedChangeSeqId: 0
+            lastExecutedChangeSeqId: -1
         };
     }
 
