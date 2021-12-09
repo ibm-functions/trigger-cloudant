@@ -105,11 +105,11 @@ module.exports = function (logger, triggerDB, redisClient) {
             	if (seq_info == null || !seq_info.includes('-') ) {
              		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
             	}else{
-	                seq_nr = seq_info.split('-')[0]; 
+	                seq_nr = Number(seq_info.split('-')[0]); 
 	            	if ( seq_nr > triggerData.lastExecutedChangeSeqId ) {
 	            		triggerData.lastExecutedChangeSeqId = seq_nr;
 	            	    var triggerHandle = self.triggers[triggerData.id];
-	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr);
+	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr ,' for doc: ', change.id , ' whith revision : ', change.doc._rev );
 	                    if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
 	                        try {
 	                            fireTrigger(triggerData.id, change);
@@ -118,7 +118,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 	                        }
 	                    }
 	            	}else{
-	            		logger.info(method, 'Trigger', triggerData.id, ' filtered out already executed change with seq_id = ',seq_nr);
+	            		logger.info(method, 'Trigger', triggerData.id, ' on customer DB: ',  triggerData.dbname ,' filtered out already executed change with seq_id = ',seq_nr , ' on document : ', change.id , ' whith revision : ', change.doc._rev);
 	            	}
             	}	
             });
@@ -157,7 +157,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             	let seq_id_str =  JSON.stringify(seq_id);
             	// Simple check to do only an update only with a valid seq_number
             	if ( seq_id_str.includes('-') ) {
-            		triggerData.lastExecutedChangeSeqId = seq_id_str.split('-')[0];
+            		triggerData.lastExecutedChangeSeqId = Number(seq_id_str.split('-')[0]);
             	}
             	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
             });
