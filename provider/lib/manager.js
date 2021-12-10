@@ -169,12 +169,11 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
             
             feed.on('catchup', function (seq_id) {
-            	let seq_id_str =  JSON.stringify(seq_id);
             	// Simple check to do only an update only with a valid seq_number
-            	if ( seq_id_str.includes('-') ) {
-            		triggerData.lastExecutedChangeSeqId = Number(seq_id_str.split('-')[0]);
+            	if ( seq_id.includes('-') ) {
+            		triggerData.lastExecutedChangeSeqId = Number(seq_id.split('-')[0]);
             	}
-            	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
+            	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', seq_id);
             });
             
             feed.on('retry', function (info) {
