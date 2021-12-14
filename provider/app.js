@@ -31,6 +31,7 @@ var ProviderManager = require('./lib/manager.js');
 var ProviderHealth = require('./lib/health.js');
 var ProviderActivation = require('./lib/active.js');
 var ProviderPauseResume = require('./lib/pauseResume.js');
+var ProviderChangesFilter = require('./lib/ChangesFilterFlag.js');
 var constants = require('./lib/constants.js');
 
 // Initialize the Express Application
@@ -148,6 +149,7 @@ function init(server) {
         var providerHealth = new ProviderHealth(logger, providerManager);
         var providerActivation = new ProviderActivation(logger, providerManager);
         var providerPauseResume = new ProviderPauseResume(logger, providerManager);
+        var providerChangesFilter = new ProviderChangesFilter(logger, providerManager);
 
         // Health Endpoint
         app.get(providerHealth.endPoint, providerManager.authorize, providerHealth.health);
@@ -157,6 +159,9 @@ function init(server) {
         
         // PauseResume Endpoint
         app.get(providerPauseResume.endPoint, providerManager.authorize, providerPauseResume.pauseresume);
+        
+        // ChangesFilter Endpoint
+        app.get(providerChangesFilter.endPoint, providerManager.authorize, providerChangesFilter.changesfilter);
 
         //*********************************************************
         //* register health object, so that manager use it 

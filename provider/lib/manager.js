@@ -39,7 +39,8 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.redisField = constants.REDIS_FIELD;
     this.uriHost = 'https://' + this.routerHost;
     this.monitorStatus = {};
-    this.pauseResumeEnabled = "true";   //* By default it is switched OFF
+    this.pauseResumeEnabled = "true";   //* By default it is switched ON
+    this.changesFilterEnabled = "true"; //* By default it is switched ON
     this.healthObject; 
     
     //****************************************************
@@ -101,15 +102,29 @@ module.exports = function (logger, triggerDB, redisClient) {
             	//* number of each change is tracked 
             	//******************************************************************
             	let seq_info = change.seq;
-            	let seq_nr = 0
+               	let seq_nr = 0
+            	let doc_name ="unknown"
+            	let doc_revision="unknown"
+         
             	if (seq_info == null || !seq_info.includes('-') ) {
              		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
             	}else{
-	                seq_nr = seq_info.split('-')[0]; 
-	            	if ( seq_nr > triggerData.lastExecutedChangeSeqId ) {
+	                seq_nr = Number(seq_info.split('-')[0]); 
+	                if ( change.id != null){
+	                	doc_name = change.id; 
+	                }
+	                if ( change.doc != null && change.doc._rev != null ){
+	                	doc_revision= change.doc._rev; 
+	                }
+	                
+	                //***********************************************************
+	                //* if changes filter is switched off, then fire trigger for 
+	                //* each received change notification 
+	                //***********************************************************
+	            	if ( self.changesFilterEnabled == "false" ||  seq_nr > triggerData.lastExecutedChangeSeqId ) {
 	            		triggerData.lastExecutedChangeSeqId = seq_nr;
 	            	    var triggerHandle = self.triggers[triggerData.id];
-	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr);
+	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr ,' for doc: ', doc_name , ' whith revision : ', doc_revision );
 	                    if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
 	                        try {
 	                            fireTrigger(triggerData.id, change);
@@ -118,7 +133,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 	                        }
 	                    }
 	            	}else{
-	            		logger.info(method, 'Trigger', triggerData.id, ' filtered out already executed change with seq_id = ',seq_nr);
+	            		logger.info(method, 'Trigger', triggerData.id, ' on customer DB: ',  triggerData.dbname ,' filtered out already executed change with seq_id = ',seq_nr , ' on document : ', doc_name , ' whith revision : ', doc_revision);
 	            	}
             	}	
             });
@@ -154,12 +169,11 @@ module.exports = function (logger, triggerDB, redisClient) {
             });
             
             feed.on('catchup', function (seq_id) {
-            	let seq_id_str =  JSON.stringify(seq_id);
             	// Simple check to do only an update only with a valid seq_number
-            	if ( seq_id_str.includes('-') ) {
-            		triggerData.lastExecutedChangeSeqId = seq_id_str.split('-')[0];
+            	if ( seq_id.includes('-') ) {
+            		triggerData.lastExecutedChangeSeqId = Number(seq_id.split('-')[0]);
             	}
-            	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', JSON.stringify(seq_id));
+            	logger.info(method, 'Changes sequences number on customer db ( for trigger  ', triggerData.id , ' ) adjusted to : ', seq_id);
             });
             
             feed.on('retry', function (info) {
