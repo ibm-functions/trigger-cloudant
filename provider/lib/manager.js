@@ -113,7 +113,7 @@ module.exports = function (logger, triggerDB, redisClient) {
 	                if ( change.id != null){
 	                	doc_name = change.id; 
 	                }
-	                if ( change.changes != null && change.changes[0].rev != null ){
+	                if ( change.changes != null && change.changes[0] != null && change.changes[0].rev != null ){
 	                	doc_revision= change.changes[0].rev; 
 	                }
 	                
