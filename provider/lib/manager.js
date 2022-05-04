@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-var request = require('request');
+var needle = require('needle');
 var HttpStatus = require('http-status-codes');
 var constants = require('./constants.js');
 var authHandler = require('./authHandler');
@@ -332,9 +332,9 @@ module.exports = function (logger, triggerDB, redisClient) {
 
             self.authRequest(triggerData, {
                 method: 'post',
-                uri: uri,
-                json: form
-            }, function (error, response) {
+                uri: uri
+            },form,
+            function (error, response) {
                 try {
                     var statusCode = response ? response.statusCode : undefined;
                     var headers = response ? response.headers : undefined;
@@ -482,8 +482,9 @@ module.exports = function (logger, triggerDB, redisClient) {
                         logger.info(method, 'Checking if trigger', triggerIdentifier, 'still exists');
                         self.authRequest(doc, {
                             method: 'get',
-                            url: triggerURL
-                        }, function (error, response) {
+                            uri: triggerURL
+                        },undefined, 
+                        function (error, response) {
                             if (!error && shouldDisableTrigger(response.statusCode, response.headers, isIAMNamespace)) {
                                 var message = 'Automatically disabled after receiving a ' + response.statusCode + ' status code on init trigger';
                                 disableTrigger(triggerIdentifier, response.statusCode, message);
@@ -705,17 +706,68 @@ module.exports = function (logger, triggerDB, redisClient) {
         }
     }
 
-    this.authRequest = function (triggerData, options, cb) {
+    this.authRequest = function (triggerData, options, body,  cb) {
 
         authHandler.handleAuth(triggerData, logger, options)
         .then(requestOptions => {
-            request(requestOptions, cb);
+        	//**********************************************************
+        	//* input options must be adapted to match the usage 
+        	//* of the needle-package (substitution of request-package)
+        	//* Current limitation is, that no query parameters are 
+        	//* considered, because providers do not need them. 
+        	//**********************************************************
+        	var needleMethod = requestOptions.method; 
+        	var needleUrl = requestOptions.uri;
+        	var needleOptions = {
+                rejectUnauthorized: false
+            };
+            if( requestOptions.auth.user ) {   //* cf-based authorization 
+                const usernamePassword = requestOptions.auth.user  +":"+ requestOptions.auth.pass;
+                const usernamePasswordEnc = Buffer.from(usernamePassword).toString('base64');
+                needleOptions.headers = {}
+                needleOptions.headers['Authorization'] = "Basic " + usernamePasswordEnc
+            }else if ( requestOptions.auth.bearer) { //* IAM based authorization 
+                needleOptions.headers = {}
+                needleOptions.headers['Authorization'] = 'Bearer ' +  requestOptions.auth.bearer
+            }else {
+            	logger.info(method, "no authentication info available");
+            }
+        
+           	if (needleMethod === 'get') {
+        		needleOptions.json = false
+                needle.request( needleMethod, needleUrl, undefined, needleOptions ,cb);
+        	   
+        	}else {
+        	    needleOptions.json = true
+                needleParams = body;
+        	    needle.request( needleMethod, needleUrl, needleParams, needleOptions ,cb);
+            }
+       
         })
         .catch(err => {
             cb(err);
         });
     };
 
+    //***************************************************************
+    //* helper function to format parameters to an url-encoded string 
+    //***************************************************************
+    serialize = function(obj, prefix) {
+        var str = [],
+        p;
+        for (p in obj) {
+            if (obj.hasOwnProperty(p)) {
+                var k = prefix ? prefix + "[" + p + "]" : p,
+                v = obj[p];
+                str.push((v !== null && typeof v === "object") ?
+                serialize(v, k) :
+                encodeURIComponent(k) + "=" + encodeURIComponent(v));
+            }
+        }
+        return str.join("&");
+    }
+
+    
     function parseQName(qname, separator) {
         var parsed = {};
         var delimiter = separator || ':';
