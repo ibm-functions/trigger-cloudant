@@ -177,12 +177,11 @@ module.exports = function (logger, manager) {
     function createTrigger(triggerURL, apikey) {
 
         return new Promise(function (resolve, reject) {
+        	var body = {};
             manager.authRequest({apikey: apikey}, {
                 method: 'put',
-                uri: triggerURL,
-                json: true,
-                body: {}
-            }, function (error, response) {
+                uri: triggerURL
+            }, body, function (error, response) {
                 if (error || response.statusCode >= 400) {
                 	if( error ) {
                       reject('self-test trigger HTTP call to openWhisk failed with error = ',error );
@@ -215,7 +214,8 @@ module.exports = function (logger, manager) {
         manager.authRequest(triggerData, {
             method: 'delete',
             uri: triggerData.uri
-        }, function (error, response) {
+        }, undefined, 
+        function (error, response) {
             logger.info(method, triggerID, 'http delete request, STATUS:', response ? response.statusCode : undefined);
             if (error || response.statusCode >= 400) {
                 if (!error && response.statusCode === 409 && retryCount < 5) {
