@@ -123,7 +123,7 @@ class CloudantHealthFeedTests
             CloudantUtil.createDocument(myCloudantCreds, "{\"test\":\"test_doc2\"}")
 
             println("checking for new triggers (no new ones expected)")
-            val activationsAfterDelete = wsk.activation.pollFor(N = 2, Some(triggerName)).length
+            val activationsAfterDelete = wsk.activation.pollFor(N = 2, Some(triggerName),retries = 30).length
             println(s"Found activation size after delete: $activationsAfterDelete")
             activationsAfterDelete should be(1)
     }
