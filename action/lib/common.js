@@ -119,12 +119,14 @@ function verifyTriggerAuth(triggerData, isDelete) {
            if (err.statusCode) {
                var statusCode = err.statusCode;
                if (!(isDelete && statusCode === 404)) {
-                   reject(sendError(statusCode, 'Trigger authentication request failed.'));
+            	   var resultMsg='Check for trigger ('+ triggerData.name + ') in namespace (' + triggerData.namespace + ') failed with status code =' + statusCode + ', msg = '
+                   reject(sendError(statusCode, resultMsg, err.message));
                } else {
                    resolve();
                }
            } else {
-               reject(sendError(400, 'Trigger authentication request failed.', err.message));
+        	   var resultMsg='Check for trigger ('+ triggerData.name + ') in namespace (' + triggerData.namespace + ') failed with unknown status code, msg = '
+               reject(sendError(400, resultMsg, err.message));
            }
         });
     });
