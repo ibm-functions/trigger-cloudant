@@ -86,18 +86,22 @@ class CloudantFeedWebTests
     }
 
     it should "reject post of a trigger when authentication fails" in {
-
-        makePostCallWithExpectedResult(requiredParams, JsObject("error" -> JsString("Trigger authentication request failed.")), 401)
+        /* 
+        * expected error message resut starts with 'Check for trigger'
+        */
+        makePostCallWithExpectedResult(requiredParams, JsObject("error" -> JsString("Check for trigger")), 401)
     }
 
     it should "reject delete of a trigger due to missing triggerName argument" in {
         val params = JsObject(requiredParams.fields - "triggerName")
-
         makeDeleteCallWithExpectedResult(params, JsObject("error" -> JsString("no trigger name parameter was provided")), 400)
     }
 
     it should "reject delete of a trigger when authentication fails" in {
-        makeDeleteCallWithExpectedResult(requiredParams, JsObject("error" -> JsString("Trigger authentication request failed.")), 401)
+       /* 
+        * expected error message resut starts with 'Check for trigger'
+        */
+        makeDeleteCallWithExpectedResult(requiredParams, JsObject("error" -> JsString("Check for trigger")), 401)
     }
 
     def makePostCallWithExpectedResult(params: JsObject, expectedResult: JsObject, expectedCode: Int) = {
