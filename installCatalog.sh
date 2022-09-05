@@ -22,7 +22,7 @@ DB_URL="$3"
 DB_NAME="${4}cloudanttrigger"
 APIHOST="$5"
 WORKERS="$6"
-ACTION_RUNTIME_VERSION=${ACTION_RUNTIME_VERSION:="nodejs:12"}
+ACTION_RUNTIME_VERSION=${ACTION_RUNTIME_VERSION:="nodejs:14"}
 
 # If the auth key file exists, read the key in the file. Otherwise, take the
 # first argument as the key itself.
