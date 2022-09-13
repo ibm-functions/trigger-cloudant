@@ -6,6 +6,7 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get purge -y --auto-remove curl git
 
 ADD package.json /cloudantTrigger/
+RUN echo "engine-strict=true" > /cloudantTrigger/.npmrc
 RUN cd /cloudantTrigger && npm install --omit=dev
 
 ADD provider/. /cloudantTrigger/
