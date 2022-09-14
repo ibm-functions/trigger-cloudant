@@ -6,6 +6,7 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get purge -y --auto-remove curl git
 
 ADD package.json /cloudantTrigger/
+# let npm install call Fail in case of not matching npm engine requirements.
 RUN echo "engine-strict=true" > /cloudantTrigger/.npmrc
 RUN cd /cloudantTrigger && npm install --omit=dev
 
