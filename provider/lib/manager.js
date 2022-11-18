@@ -126,14 +126,21 @@ module.exports = function (logger, triggerDB, redisClient) {
 
                 if ( self.changesFilterEnabled == "true"   &&  doc_name != "unknown" ) {  //** over endpoint switch ON/OFF possible */
 
-                    var revInHistory = triggerHandle.lruCache.get(doc_name);
-                    if (revInHistory == undefined){
-                        triggerHandle.lruCache.set(doc_name, doc_revision);  
-                        filterChangeOut = false;   
-                    }else  if ( parseInt(doc_revision)  > parseInt(revInHistory) ){
-                        filterChangeOut = false;
-                    }else{
-                        filterChangeOut = true; 
+                    //********************************************************
+                    //* internal health test triggers, created in health.js do 
+                    //* not create an lruCache in its triggerdata. So skip the 
+                    //* filtering for them 
+                    //*********************************************************
+                    if ( !(triggerHandle.lruCache == undefined) ) {
+                        var revInHistory = triggerHandle.lruCache.get(doc_name);
+                        if (revInHistory == undefined){
+                            triggerHandle.lruCache.set(doc_name, doc_revision);  
+                            filterChangeOut = false;   
+                        }else  if ( parseInt(doc_revision)  > parseInt(revInHistory) ){
+                            filterChangeOut = false;
+                        }else{
+                            filterChangeOut = true; 
+                        }
                     }
                 }
                 
