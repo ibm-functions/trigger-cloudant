@@ -16,6 +16,7 @@
  */
 
 var needle = require('needle');
+const LRU = require('lru-cache');
 var HttpStatus = require('http-status-codes');
 var constants = require('./constants.js');
 var authHandler = require('./authHandler');
@@ -33,7 +34,7 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.host = process.env.HOST_INDEX || 'host0';
     this.hostPrefix = this.host.replace(/\d+$/, '');
     this.activeHost = `${this.hostPrefix}0`; //default value on init (will be updated for existing redis)
-    this.db = triggerDB;
+    this.db = triggerDB;                     //Database in which the triggers are configured
     this.redisClient = redisClient;
     this.redisKey = redisKeyPrefix + '_' + this.worker;
     this.redisField = constants.REDIS_FIELD;
@@ -93,49 +94,62 @@ module.exports = function (logger, triggerDB, redisClient) {
 
             triggerData.feed = feed;
             self.triggers[triggerData.id] = triggerData;
-
+          
             feed.on('change', function (change) {
                 //****************************************************************
-            	//* Cloundant DB changes tracking gets sometimes  duplicated Changes
-            	//* notified in case of "cloudant DB rewind" situation. To prevent the 
-            	//* provider from fire triggers for these duplications the seq_id 
-            	//* number of each change is tracked 
-            	//******************************************************************
-            	let seq_info = change.seq;
-               	let seq_nr = 0
-            	let doc_name ="unknown"
-            	let doc_revision="unknown"
-         
-            	if (seq_info == null || !seq_info.includes('-') ) {
-             		logger.info(method, 'Trigger', triggerData.id, ' received a change event without a seq_nr from cloudantDB. Cannot be handled !');
-            	}else{
-	                seq_nr = Number(seq_info.split('-')[0]); 
-	                if ( change.id != null){
-	                	doc_name = change.id; 
-	                }
-	                if ( change.changes != null && change.changes[0] != null && change.changes[0].rev != null ){
-	                	doc_revision= change.changes[0].rev; 
-	                }
-	                
-	                //***********************************************************
-	                //* if changes filter is switched off, then fire trigger for 
-	                //* each received change notification 
-	                //***********************************************************
-	            	if ( self.changesFilterEnabled == "false" ||  seq_nr > triggerData.lastExecutedChangeSeqId ) {
-	            		triggerData.lastExecutedChangeSeqId = seq_nr;
-	            	    var triggerHandle = self.triggers[triggerData.id];
-	            	    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr ,' for doc: ', doc_name , ' whith revision : ', doc_revision );
-	                    if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
-	                        try {
-	                            fireTrigger(triggerData.id, change);
-	                        } catch (e) {
-	                            logger.error(method, 'Exception occurred while firing trigger', triggerData.id, e);
-	                        }
-	                    }
-	            	}else{
-	            		logger.info(method, 'Trigger', triggerData.id, ' on customer DB: ',  triggerData.dbname ,' filtered out already executed change with seq_id = ',seq_nr , ' on document : ', doc_name , ' whith revision : ', doc_revision);
-	            	}
-            	}	
+                //* Cloundant DB changes tracking gets sometimes duplicated Changes
+                //* notified in case of "cloudant DB rewind" situation. To prevent the 
+                //* provider from fire triggers use a chgHistoryCache
+                //******************************************************************
+                let seq_info = change.seq;
+                let seq_nr = 0
+                let doc_name ="unknown"
+                let doc_revision="unknown"
+        
+                //*********************************************
+                //* extract seq_nr from change object to log it
+                //*********************************************
+                seq_nr = Number(seq_info.split('-')[0]); 
+                if ( change.id != null){
+                    doc_name = change.id; 
+                }
+                if ( change.changes != null && change.changes[0] != null && change.changes[0].rev != null ){
+                    doc_revision= change.changes[0].rev; 
+                }
+                
+                //***********************************************************
+                //* if changes filter is switched off, then fire trigger for 
+                //* each received change notification 
+                //***********************************************************
+                var triggerHandle = self.triggers[triggerData.id];
+                var filterChangeOut = false; 
+
+                if ( self.changesFilterEnabled == "true"   &&  doc_name != "unknown" ) {  //** over endpoint switch ON/OFF possible */
+
+                    var revInHistory = triggerHandle.lruCache.get(doc_name);
+                    if (revInHistory == undefined){
+                        triggerHandle.lruCache.set(doc_name, doc_revision);  
+                        filterChangeOut = false;   
+                    }else  if ( parseInt(doc_revision)  > parseInt(revInHistory) ){
+                        filterChangeOut = false;
+                    }else{
+                        filterChangeOut = true; 
+                    }
+                }
+                
+                if ( filterChangeOut == false ) {  
+                    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr ,' for doc: ', doc_name , ' whith revision : ', doc_revision );
+                    if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
+                        try {
+                            fireTrigger(triggerData.id, change);
+                        } catch (e) {
+                            logger.error(method, 'Exception occurred while firing trigger', triggerData.id, e);
+                        }
+                    }
+                }else{
+                    logger.info(method, 'Trigger', triggerData.id, ' on customer DB: ',  triggerData.dbname ,' filtered out the on document : ', doc_name , ' whith revision : ', doc_revision);
+                }
+            
             });
 
             feed.on('timeout', function (info) {
@@ -150,8 +164,6 @@ module.exports = function (logger, triggerDB, redisClient) {
                 logger.info(method, "Cloudant provider stop change listening socket to customer DB ', triggerData.dbname ,' for trigger:",  triggerData.id );
             });
             
-            feed.follow();
-
             //**********************************************************
             //* additional feed listeners for logging purpose to get info 
             //* about DB change listener socket to customer DB 
@@ -160,26 +172,11 @@ module.exports = function (logger, triggerDB, redisClient) {
                 logger.info(method, 'Cloudant provider establish change listen socket to customer db ', triggerData.dbname ,' for trigger: ', triggerData.id );
             });
             
-            feed.on('confirm', function () {
-                logger.info(method, 'Cloudant provider starts listening for changes on customer db ', triggerData.dbname ,' for trigger: ', triggerData.id );
-            });
-            
-            feed.on('timeout', function (info) {
-                logger.info(method, 'Got timeout while listening changes on customer db ', triggerData.dbname ,' for trigger:', triggerData.id, ' : ', JSON.stringify(info));
-            });
-            
             feed.on('catchup', function (seq_id) {
-            	// Simple check to do only an update only with a valid seq_number
-            	if ( seq_id.includes('-') ) {
-            		triggerData.lastExecutedChangeSeqId = Number(seq_id.split('-')[0]);
-            	}
             	logger.info(method, 'Changes sequences number on customer db ', triggerData.dbname ,' ( for trigger  ', triggerData.id , ' ) adjusted to : ', seq_id);
             });
-            
-            feed.on('retry', function (info) {
-                logger.info(method, 'Follow lib retries to establish listening changes socket to customer database ', triggerData.dbname ,' ( for trigger  ', triggerData.id,' ) : ', JSON.stringify(info));
-            });
-            
+
+           
             return new Promise(function (resolve, reject) {
                 feed.on('error', function (err) {
                     logger.error(method, 'Error occurred for trigger', triggerData.id, '(db ' + triggerData.dbname + ' ):', err);
@@ -197,7 +194,63 @@ module.exports = function (logger, triggerDB, redisClient) {
                     }
                     resolve(triggerData.id);
                 });
+
+                //***************************************************************
+                //* if createTrigger() is called during initAllTriggers  then 
+                //* read the chgHistory Hash table from Redis and fill into the 
+                //* lruCache before starting to listen on customer DB (feed.follow)
+                //***************************************************************
+                if  ( isStartup ) {
+                    let redisHashName = self.worker + "_" + triggerData.id; 
+                    self.redisClient.hgetallAsync( redisHashName )
+                    .then(  docHistory => {
+                        //****************************************
+                        //* docHistory == null, if no docs in Hash 
+                        //****************************************
+                        if ( docHistory == null ) {
+                            logger.info(method, 'No ChgHistory found in REDIS DB for trigger ', redisHashName, '. Provider runs OK without pre-loaded chgHistory cache');
+                        } else {
+                            //*******************************************************************************
+                            //* docHistory is in format :  "history" : <JsonString of all doc/rev elememts>
+                            //* JsonString :  [{"doc": "<docName>","rev":"<revValue>"},{"doc": "<docName>","rev":"<revValue>"},....]
+                            //*******************************************************************************
+                            let docHistoryArray = Object.entries(docHistory)
+                            var historyElement = docHistoryArray[0];   // only 1 record in the array 
+                            var chgHistoryOftrigger =  JSON.parse(docHistoryArray[historyElement][1]) 
+                            var numOfChgHistoryElements = 0 ; 
+
+                            //***********************************************************
+                            //* Fill read chgHistory info to the lru Caches
+                            //***********************************************************
+                            chgHistoryOftrigger.forEach( (element) =>{  
+                                triggerData.lruCache.set ( element.doc, element.rev)
+                                numOfChgHistoryElements = numOfChgHistoryElements + 1 ; 
+
+                            })
+                            logger.info(method, 'lruCache for trigger = ', redisHashName, ' loaded with ', numOfChgHistoryElements , ' doc/revision records');
+                            if ( numOfChgHistoryElements > 0 ) {
+                                self.redisClient.delAsync(redisHashName) 
+                                .then(  () => {
+                                    logger.info(method, 'chgHistory for trigger = ', redisHashName, ' with ', numOfChgHistoryElements , ' doc/revision records intentionally deleted');
+                                })   
+                            }
+                        }    
+                    })
+                    .catch(err => {
+                        logger.info(method, 'Error while reading chgHistory in REDIS DB for trigger ', redisHashName, '. Provider runs OK without pre-loaded chgHistory cache. Err = ', err);
+                    })
+                    .finally(() => {
+                        //*******************************************
+                        //* in all cases start cloudant DB listening
+                        //*******************************************
+                        feed.follow();
+                    });
+                    
+                } else { 
+                    feed.follow(); 
+                } 
             });
+            
 
         } catch (err) {
             logger.info(method, 'caught an exception in change listener to customer DB ', triggerData.dbname ,' for trigger', triggerData.id, err);
@@ -226,7 +279,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             additionalData: newTrigger.additionalData,
             iamApiKey: authHandler.decryptAuth(newTrigger.iamApiKey),
             iamUrl: newTrigger.iamUrl,
-            lastExecutedChangeSeqId: -1
+            lruCache: initLRUCache()
         };
     }
 
@@ -691,7 +744,37 @@ module.exports = function (logger, triggerDB, redisClient) {
                             var redundantHost = self.host === `${self.hostPrefix}0` ? `${self.hostPrefix}1` : `${self.hostPrefix}0`;
                             self.redisClient.hsetAsync(self.redisKey, self.redisField, redundantHost)
                             .then(() => {
+                                //*******************************************************
+                                //* notify worker partner to get info about worker 
+                                //* active state change 
+                                //********************************************************
                                 self.redisClient.publish(self.redisKey, redundantHost);
+                            })
+                            .then( () => {
+                                //*******************************************************
+                                //* save lruCache with chgHistory for each trigger to REDIS, so it can 
+                                //* be reloaded on next re-start of this worker
+                                //********************************************************
+                                for( triggername in self.triggers ) {
+                                    let redisHashName = self.worker + "_" + triggername; 
+                                    let historyDocsArrayFromCache = new Array ();
+                                    let numOfChgHistoryElements = 0; 
+                                
+                                    self.triggers[triggername].lruCache.forEach( (value,key,cache) =>{
+                                        historyDocsArrayFromCache.push({ 'doc' : key , 'rev' : value } );
+                                        numOfChgHistoryElements = numOfChgHistoryElements +  1; 
+                                    })
+                      
+                                    let historyDataJsonString = JSON.stringify(historyDocsArrayFromCache);
+
+                                    self.redisClient.hsetAsync( redisHashName, "history" , historyDataJsonString)
+                                    .then(  res => {
+                                        logger.info(method, 'lruCache for trigger = ', redisHashName, ' stored to Redis with ', numOfChgHistoryElements , ' doc/revision records');
+                                    })
+                                    .catch(err => {
+                                        logger.info(method, 'lruCache for trigger = ', redisHashName, ' stored to Redis failed with err = ',err );
+                                    }) 
+                                }
                             })
                             .catch(err => {
                                 logger.error(method,'Fail to process SIGTERM and inform redis', err);
@@ -800,4 +883,19 @@ module.exports = function (logger, triggerDB, redisClient) {
         }
         return parsed;
     }
+
+    //**************************************************************************************************
+    //* helper function to establish connection to the redis server addressed by URL
+    //**************************************************************************************************
+    function initLRUCache() {
+
+        const lruCache = new LRU({
+            // number of most recently used items to keep ( 3 million items in average size of 160 Bytes =  ca 500MB in memory )
+            max: 3000000
+        });
+
+        return lruCache;     
+    };
+
 };
+
