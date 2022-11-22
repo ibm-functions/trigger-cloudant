@@ -21,6 +21,8 @@ var HttpStatus = require('http-status-codes');
 var constants = require('./constants.js');
 var authHandler = require('./authHandler');
 
+var isShutdown = false; 
+
 module.exports = function (logger, triggerDB, redisClient) {
 
     var redisKeyPrefix = process.env.REDIS_KEY_PREFIX || triggerDB.config.db;
@@ -330,6 +332,20 @@ module.exports = function (logger, triggerDB, redisClient) {
 
             delete self.triggers[triggerIdentifier];
             logger.info(method, 'trigger', triggerIdentifier, 'successfully deleted from memory');
+
+            //*******************************************************
+            //* Internal test triggers do not have a lruCache as 
+            //* Change History tracker and no RedisHashmap to store it.
+            //* So ensure that only for prod triggers the Redis 
+            //* hashmap gets deleted, when a trigger gets deleted 
+            //********************************************************
+            if ( self.triggers[triggerIdentifier].lruCache.size > 0 ) {   
+                let redisHashName = self.worker + "_" + triggerIdentifier;             
+                self.redisClient.delAsync(redisHashName) 
+                .then(  () => {
+                    logger.info(method, 'chgHistory for the deleted trigger = ', redisHashName, ' intentionally deleted');
+                })   
+            }
 
             if (isMonitoringTrigger(monitorTrigger, triggerIdentifier)) {
                 self.monitorStatus.triggerStopped = "success";
@@ -747,46 +763,78 @@ module.exports = function (logger, triggerDB, redisClient) {
                 })
                 .then(() => {
                     process.on('SIGTERM', function onSigterm() {
-                        if (self.activeHost === self.host) {
-                            var redundantHost = self.host === `${self.hostPrefix}0` ? `${self.hostPrefix}1` : `${self.hostPrefix}0`;
-                            self.redisClient.hsetAsync(self.redisKey, self.redisField, redundantHost)
-                            .then(() => {
-                                //*******************************************************
-                                //* notify worker partner to get info about worker 
-                                //* active state change 
-                                //********************************************************
-                                self.redisClient.publish(self.redisKey, redundantHost);
-                            })
-                            .then( () => {
-                                //*******************************************************
-                                //* save lruCache with chgHistory for each trigger to REDIS, so it can 
-                                //* be reloaded on next re-start of this worker
-                                //********************************************************
-                                for( triggername in self.triggers ) {
+                        //*************************************
+                        //* prevent from running SIGTERM multiple times 
+                        //* in parallel 
+                        //**************************************
+                        if ( isShutdown == false ) {
+                            isShutdown=true; 
+
+                            logger.info(method, 'SIGTERM Handler started. Going to store provider data to REDIS' );
+                            let promiseArray = [];
+                            let promiseToAwait;
+                            
+                            if (self.activeHost === self.host) {
+                                logger.info(method, 'SIGTERM Handler will set worker partner to active host ');
+                                var redundantHost = self.host === `${self.hostPrefix}0` ? `${self.hostPrefix}1` : `${self.hostPrefix}0`;
+                                promiseToAwait = self.redisClient.hsetAsync(self.redisKey, self.redisField, redundantHost)
+                                .then(() => {
+                                    //*******************************************************
+                                    //* notify worker partner to get info about worker 
+                                    //* active state change 
+                                    //********************************************************
+                                    self.redisClient.publish(self.redisKey, redundantHost);
+                                })
+                                .catch(err => {
+                                    logger.error(method,'Fail to process SIGTERM and inform redis', err);
+                                });
+                                promiseArray.push(promiseToAwait);
+                            }    
+                                
+                            //*******************************************************
+                            //* save lruCache with chgHistory for each trigger to REDIS, so it can 
+                            //* be reloaded on next re-start of this worker
+                            //********************************************************
+                            logger.info(method, 'SIGTERM Handler going to store chgHistory data to REDIS ');
+                            for( triggername in self.triggers ) {
+                                if ( self.triggers[triggername].lruCache.size > 0 ) {                
+                        
                                     let redisHashName = self.worker + "_" + triggername; 
                                     let historyDocsArrayFromCache = new Array ();
                                     let numOfChgHistoryElements = 0; 
-                                
+
                                     self.triggers[triggername].lruCache.forEach( (value,key,cache) =>{
                                         historyDocsArrayFromCache.push({ 'doc' : key , 'rev' : value } );
                                         numOfChgHistoryElements = numOfChgHistoryElements +  1; 
                                     })
-                      
                                     let historyDataJsonString = JSON.stringify(historyDocsArrayFromCache);
 
-                                    self.redisClient.hsetAsync( redisHashName, "history" , historyDataJsonString)
+                                    promiseToAwait = self.redisClient.hsetAsync( redisHashName, "history" , historyDataJsonString)
                                     .then(  res => {
                                         logger.info(method, 'lruCache for trigger = ', redisHashName, ' stored to Redis with ', numOfChgHistoryElements , ' doc/revision records');
                                     })
                                     .catch(err => {
                                         logger.info(method, 'lruCache for trigger = ', redisHashName, ' stored to Redis failed with err = ',err );
                                     }) 
+                                    promiseArray.push(promiseToAwait);
+                                } else {
+                                    logger.info(method, 'No elements in lruCache available to store to redis for trigger =', triggername);
                                 }
-                            })
-                            .catch(err => {
-                                logger.error(method,'Fail to process SIGTERM and inform redis', err);
-                            });
+                            }
+                        
+                            //**********************************
+                            //* add the promise to the list of open "threads"
+                            //************************************************
+                            Promise.allSettled( promiseArray )
+                            .then ( (results) => { 
+                                logger.error(method,'Writing data to REDIS completed ');
+                            })      
+                    
+                            logger.info(method, 'SIGTERM Handler done. started async termination actions ' );
                         }
+                        else{
+                            logger.info(method, 'SIGTERM Handler called twice, ignore second calling ' );
+                        }                    
                     });
                     resolve();
                 })
