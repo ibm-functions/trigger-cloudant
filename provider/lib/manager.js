@@ -339,7 +339,7 @@ module.exports = function (logger, triggerDB, redisClient) {
             //* So ensure that only for prod triggers the Redis 
             //* hashmap gets deleted, when a trigger gets deleted 
             //********************************************************
-            if ( self.triggers[triggerIdentifier].lruCache.size > 0 ) {   
+            if (  (!( self.triggers[triggerIdentifier].lruCache == undefined ))  &&  self.triggers[triggerIdentifier].lruCache.size > 0 ) {   
                 let redisHashName = self.worker + "_" + triggerIdentifier;             
                 self.redisClient.delAsync(redisHashName) 
                 .then(  () => {
@@ -797,7 +797,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                             //********************************************************
                             logger.info(method, 'SIGTERM Handler going to store chgHistory data to REDIS ');
                             for( triggername in self.triggers ) {
-                                if ( self.triggers[triggername].lruCache.size > 0 ) {                
+                                if (  (!( self.triggers[triggerIdentifier].lruCache == undefined )) && self.triggers[triggername].lruCache.size > 0 ) {                
                         
                                     let redisHashName = self.worker + "_" + triggername; 
                                     let historyDocsArrayFromCache = new Array ();
