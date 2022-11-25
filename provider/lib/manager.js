@@ -103,20 +103,19 @@ module.exports = function (logger, triggerDB, redisClient) {
                 //* notified in case of "cloudant DB rewind" situation. To prevent the 
                 //* provider from fire triggers use a chgHistoryCache
                 //******************************************************************
-                let seq_info = change.seq;
-                let seq_nr = 0
                 let doc_name ="unknown"
                 let doc_revision="unknown"
+                let doc_revision_nr = 0
         
                 //*********************************************
                 //* extract seq_nr from change object to log it
                 //*********************************************
-                seq_nr = Number(seq_info.split('-')[0]); 
                 if ( change.id != null){
                     doc_name = change.id; 
                 }
                 if ( change.changes != null && change.changes[0] != null && change.changes[0].rev != null ){
                     doc_revision= change.changes[0].rev; 
+                    doc_revision_nr= Number(doc_revision.split('-')[0]); 
                 }
                 
                 //***********************************************************
@@ -127,7 +126,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                 var filterChangeOut = false; 
 
                 if ( self.changesFilterEnabled == "true"   &&  doc_name != "unknown" ) {  //** over endpoint switch ON/OFF possible */
-
+                   
                     //********************************************************
                     //* internal health test triggers, created in health.js do 
                     //* not create an lruCache in its triggerdata. So skip the 
@@ -136,18 +135,21 @@ module.exports = function (logger, triggerDB, redisClient) {
                     if ( !(triggerHandle.lruCache == undefined) ) {
                         var revInHistory = triggerHandle.lruCache.get(doc_name);
                         if (revInHistory == undefined){
-                            triggerHandle.lruCache.set(doc_name, doc_revision);  
+                            triggerHandle.lruCache.set(doc_name, doc_revision_nr);  
                             filterChangeOut = false;   
-                        }else  if ( parseInt(doc_revision)  > parseInt(revInHistory) ){
+                        }else  if ( parseInt(doc_revision_nr)  > parseInt(revInHistory) ){
+                            triggerHandle.lruCache.set(doc_name, doc_revision_nr);  
                             filterChangeOut = false;
+                            
                         }else{
                             filterChangeOut = true; 
                         }
                     }
                 }
                 
+                logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' for doc: ', doc_name , ' whith revision : ', doc_revision );
+                
                 if ( filterChangeOut == false ) {  
-                    logger.info(method, 'Trigger', triggerData.id, 'got change from customer DB :', triggerData.dbname ,' with seq_nr = ', seq_nr ,' for doc: ', doc_name , ' whith revision : ', doc_revision );
                     if (triggerHandle && shouldFireTrigger(triggerHandle) && hasTriggersRemaining(triggerHandle)) {
                         try {
                             fireTrigger(triggerData.id, change);
@@ -223,9 +225,8 @@ module.exports = function (logger, triggerDB, redisClient) {
                             //* docHistory is in format :  "history" : <JsonString of all doc/rev elememts>
                             //* JsonString :  [{"doc": "<docName>","rev":"<revValue>"},{"doc": "<docName>","rev":"<revValue>"},....]
                             //*******************************************************************************
-                            let docHistoryArray = Object.entries(docHistory)
-                            var historyElement = docHistoryArray[0];   // only 1 record in the array 
-                            var chgHistoryOftrigger =  JSON.parse(docHistoryArray[historyElement][1]) 
+                            let docHistoryArray = docHistory.history
+                            var chgHistoryOftrigger =  JSON.parse(docHistoryArray) 
                             var numOfChgHistoryElements = 0 ; 
 
                             //***********************************************************
@@ -330,23 +331,25 @@ module.exports = function (logger, triggerDB, redisClient) {
                 self.triggers[triggerIdentifier].feed.stop();
             }
 
-            delete self.triggers[triggerIdentifier];
-            logger.info(method, 'trigger', triggerIdentifier, 'successfully deleted from memory');
-
             //*******************************************************
             //* Internal test triggers do not have a lruCache as 
             //* Change History tracker and no RedisHashmap to store it.
             //* So ensure that only for prod triggers the Redis 
             //* hashmap gets deleted, when a trigger gets deleted 
             //********************************************************
-            if (  (!( self.triggers[triggerIdentifier].lruCache == undefined ))  &&  self.triggers[triggerIdentifier].lruCache.size > 0 ) {   
-                let redisHashName = self.worker + "_" + triggerIdentifier;             
-                self.redisClient.delAsync(redisHashName) 
-                .then(  () => {
-                    logger.info(method, 'chgHistory for the deleted trigger = ', redisHashName, ' intentionally deleted');
-                })   
+            if ( !( self.triggers[triggerIdentifier].lruCache == undefined) )  {
+                if(  self.triggers[triggerIdentifier].lruCache.size > 0 ) {   
+                    let redisHashName = self.worker + "_" + triggerIdentifier;             
+                    self.redisClient.delAsync(redisHashName) 
+                    .then(  () => {
+                        logger.info(method, 'chgHistory for the deleted trigger = ', redisHashName, ' intentionally deleted');
+                    })
+                }       
             }
-
+            
+            delete self.triggers[triggerIdentifier];
+            logger.info(method, 'trigger', triggerIdentifier, 'successfully deleted from memory');
+            
             if (isMonitoringTrigger(monitorTrigger, triggerIdentifier)) {
                 self.monitorStatus.triggerStopped = "success";
                 if ( self.healthObject ) {
@@ -786,7 +789,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                                     self.redisClient.publish(self.redisKey, redundantHost);
                                 })
                                 .catch(err => {
-                                    logger.error(method,'Fail to process SIGTERM and inform redis', err);
+                                    logger.error(method,'Fail to process SIGTERM and inform redis about active status change ', err);
                                 });
                                 promiseArray.push(promiseToAwait);
                             }    
@@ -797,7 +800,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                             //********************************************************
                             logger.info(method, 'SIGTERM Handler going to store chgHistory data to REDIS ');
                             for( triggername in self.triggers ) {
-                                if (  (!( self.triggers[triggerIdentifier].lruCache == undefined )) && self.triggers[triggername].lruCache.size > 0 ) {                
+                                if (  (!( self.triggers[triggername].lruCache == undefined )) && self.triggers[triggername].lruCache.size > 0 ) {                
                         
                                     let redisHashName = self.worker + "_" + triggername; 
                                     let historyDocsArrayFromCache = new Array ();
@@ -827,7 +830,7 @@ module.exports = function (logger, triggerDB, redisClient) {
                             //************************************************
                             Promise.allSettled( promiseArray )
                             .then ( (results) => { 
-                                logger.error(method,'Writing data to REDIS completed ');
+                                logger.info(method,'Writing data to REDIS completed ');
                             })      
                     
                             logger.info(method, 'SIGTERM Handler done. started async termination actions ' );
@@ -946,7 +949,13 @@ module.exports = function (logger, triggerDB, redisClient) {
 
         const lruCache = new LRU({
             // number of most recently used items to keep ( 3 million items in average size of 160 Bytes =  ca 500MB in memory )
-            max: 3000000
+            max: 3000000,
+            updateAgeOnGet: true,
+            //*************************************************************
+            //* time after that an item in the cache will be handled as 
+            //* dead ( in msec ) -> 10 days  ( 10 * 24 *60 *60 *1000 )
+            //*************************************************************
+            ttl: 10 * 24 *60 *60 *1000 
         });
 
         return lruCache;     
