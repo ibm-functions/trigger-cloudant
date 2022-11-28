@@ -943,13 +943,16 @@ module.exports = function (logger, triggerDB, redisClient) {
     }
 
     //**************************************************************************************************
-    //* helper function to establish connection to the redis server addressed by URL
+    //* Each trigger object gets its own LruCache to hold the change history data. 
+    //* For the cache size calculation the max available storage in REDIS DB to save the whole chgHistory 
+    //* during deployment is relevant. That size is 500 MB. Assuming the max number of triggers on one 
+    //* provider will be 100. So 5 MB can be spent for each lruCache
     //**************************************************************************************************
     function initLRUCache() {
 
         const lruCache = new LRU({
-            // number of most recently used items to keep ( 3 million items in average size of 160 Bytes =  ca 500MB in memory )
-            max: 3000000,
+            // number of most recently used items to keep ( 35000 items in average size of 160 Bytes =  ca 5MB in memory )
+            max: 35000,
             updateAgeOnGet: true,
             //*************************************************************
             //* time after that an item in the cache will be handled as 
