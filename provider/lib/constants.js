@@ -24,6 +24,7 @@ const FILTERS_DESIGN_DOC = 'triggerFilters';
 const VIEWS_DESIGN_DOC = 'triggerViews';
 const MONITOR_DESIGN_DOC = 'monitorFilters';
 const TRIGGERS_BY_WORKER = 'triggers_by_worker';
+const ALL_TRIGGERS = 'all_triggers';
 const DOCS_FOR_MONITOR = 'canary_docs';
 const MONITOR_INTERVAL = 5 * 1000 * 60; //in milliseconds
 const ALGORITHM_AES_256_GCM = "aes-256-gcm";
@@ -40,6 +41,7 @@ module.exports = {
     FILTERS_DESIGN_DOC: FILTERS_DESIGN_DOC,
     VIEWS_DESIGN_DOC: VIEWS_DESIGN_DOC,
     TRIGGERS_BY_WORKER: TRIGGERS_BY_WORKER,
+    ALL_TRIGGERS: ALL_TRIGGERS,
     MONITOR_INTERVAL: MONITOR_INTERVAL,
     MONITOR_DESIGN_DOC: MONITOR_DESIGN_DOC,
     DOCS_FOR_MONITOR: DOCS_FOR_MONITOR,

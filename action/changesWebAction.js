@@ -19,6 +19,14 @@ const moment = require('moment');
 const common = require('./lib/common');
 const Database = require('./lib/Database');
 const CryptoUtils = require('./lib/CryptoUtils');
+//****************************************************
+//* load modules 
+//****************************************************
+const { CloudantV1 } = require('@ibm-cloud/cloudant');
+const { IamAuthenticator } = require('ibm-cloud-sdk-core');
+const { BasicAuthenticator } = require('ibm-cloud-sdk-core');
+
+
 
 function main(params) {
 
@@ -59,7 +67,7 @@ function main(params) {
 
         if (params.filter) {
             query_params = params.query_params;
-            if (typeof queryParams === 'string') {
+            if (typeof query_params === 'string') {
                 try {
                     query_params = JSON.parse(params.query_params);
                 } catch (e) {
@@ -96,7 +104,7 @@ function main(params) {
                         'dateChanged': Date.now()
                     },
                     additionalData: triggerData.additionalData,
-                    iamUrl: params.iamUrl || 'https://iam.bluemix.net/identity/token'
+                    iamUrl: params.iamUrl || 'https://iam.cloud.ibm.com/identity/token'
                 };
 
                 if (params.iamApiKey) {
@@ -275,38 +283,55 @@ function main(params) {
 
 function verifyUserDB(triggerObj) {
 
-    var Cloudant = require('@cloudant/cloudant');
-    var cloudant;
+    var client;
+    let options; 
 
-    if (triggerObj.iamApiKey) {
-        var dbURL = `${triggerObj.protocol}://${triggerObj.host}`;
-        if (triggerObj.port) {
-            dbURL += ':' + triggerObj.port;
-        }
-        cloudant = new Cloudant({
-            url: dbURL,
-            plugins: {iamauth: {iamApiKey: triggerObj.iamApiKey, iamTokenUrl: triggerObj.iamUrl}}
-        });
-    } else {
-        var url = `${triggerObj.protocol}://${triggerObj.user}:${triggerObj.pass}@${triggerObj.host}`;
-        if (triggerObj.port) {
-            url += ':' + triggerObj.port;
-        }
-        cloudant = Cloudant(url);
+    var dbURL = `${triggerObj.protocol}://${triggerObj.host}`;
+    if (triggerObj.port) {
+        dbURL += ':' + triggerObj.port;
     }
 
+    if (triggerObj.iamApiKey) {
+		//******************************************************
+		//* options if cloudant DB is using IAM Authentication 
+		//******************************************************
+		const authenticator = new IamAuthenticator({
+			apikey: triggerObj.iamApiKey,
+			url: triggerObj.iamUrl
+		});
+
+		options = {
+			authenticator,
+		};
+    } else {
+		//******************************************************
+		//* options if cloudant DB is using Basic Auth with 
+		//* userid/pw 	
+		//******************************************************
+		const authenticator = new BasicAuthenticator({
+			username: triggerObj.user,
+			password: triggerObj.pass,
+		});
+
+		options = {
+			authenticator,
+		};
+	}
+	client = CloudantV1.newInstance(options); 
+	client.setServiceUrl(dbURL);
+	
     return new Promise(function (resolve, reject) {
         try {
-            var userDB = cloudant.use(triggerObj.dbname);
-            userDB.info(function (err, body) {
-                if (!err) {
-                    resolve();
-                } else {
-                    reject(common.sendError(err.statusCode, 'error connecting to database ' + triggerObj.dbname, err.message));
-                }
+            client.getDatabaseInformation({ 'db' : triggerObj.dbname })
+			.then((dbInfo) => {
+				resolve();
+			})
+			.catch(err => {
+			     reject(common.sendError(err.statusCode, 'error connecting to database ' + triggerObj.dbname, err.message));
             });
+		    	
         } catch (err) {
-            reject(common.sendError(400, 'error connecting to database ' + triggerObj.dbname, err.message));
+            reject(common.sendError(400, 'General error connecting to database ' + triggerObj.dbname, err.message));
         }
 
     });

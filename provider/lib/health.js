@@ -90,6 +90,7 @@ module.exports = function (logger, manager) {
                 uri: manager.uriHost + '/api/v1/namespaces/_/triggers/' + triggerName,
                 triggerID: existingTriggerID
             };
+            logger.info(method, existingTriggerID, " self-test trigger deleted");
             deleteTrigger(triggerData, 0);
 
             //delete the canary doc which resides in the trigger config db,  too 
@@ -126,7 +127,11 @@ module.exports = function (logger, manager) {
             }, monitoringInterval / 10);
         })
         .catch(err => {
-            logger.error(method, triggerID, err);
+            if (err.message != undefined) {
+                logger.error(method, triggerID, "Failed to create monitor self-test trigger.  err = ",err.message);
+            } else {
+                logger.error(method, triggerID, "Failed to create monitor self-test trigger.  err obj = ",err);
+            }    
         });
     };
 
@@ -151,9 +156,14 @@ module.exports = function (logger, manager) {
         }
     };
     
+    //**********************************************************
+    //* self-test trigger is expecting the canary document inside 
+    //* of the triggerConfigDB.  So the configDB url and the 
+    //* configDB Name stored in the manager can be used 
+    //***********************************************************
     function createCloudantTrigger(triggerID, apikey) {
-        var dbURL = new URL(manager.db.config.url);
-        var dbName = manager.db.config.db;
+        var dbURL = new URL(manager.triggerDB.baseOptions.serviceUrl);
+        var dbName = manager.databaseName;
 
         return {
             apikey: apikey,
@@ -162,8 +172,8 @@ module.exports = function (logger, manager) {
             port: dbURL.port,
             protocol: dbURL.protocol.replace(':', ''),
             dbname: dbName,
-            user: dbURL.username,
-            pass: dbURL.password,
+            user: process.env.DB_USERNAME,
+            pass: process.env.DB_PASSWORD,
             filter: constants.MONITOR_DESIGN_DOC + '/' + constants.DOCS_FOR_MONITOR,
             query_params: {host: manager.host},
             maxTriggers: 1,
@@ -198,13 +208,17 @@ module.exports = function (logger, manager) {
     function createDocInDB(docID, doc) {
         var method = 'createDocInDB';
 
-        manager.db.insert(doc, docID, function (err) {
-            if (!err) {
-                logger.info(method, docID, 'was successfully inserted');
-            } else {
-                logger.error(method, docID, err);
-            }
-        });
+        manager.triggerDB.putDocument({
+            db: manager.databaseName,
+            docId: docID,
+            document: doc
+        })
+        .then(response => {
+            logger.info(method, docID, ': successfully inserted self-test trigger in trigger config DB ');
+        })
+        .catch( (err) => {
+            logger.error(method, docID, " : Failed to create self-test trigger in trigger configuration DB :", err);
+        })
     }
 
     function deleteTrigger(triggerData, retryCount) {
@@ -236,25 +250,47 @@ module.exports = function (logger, manager) {
         var method = 'deleteDocFromDB';
 
         //delete from database
-        manager.db.get(docID, function (err, existing) {
-            if (!err) {
-                manager.db.destroy(existing._id, existing._rev, function (err) {
-                    if (err) {
-                        if (err.statusCode === 409 && retryCount < 5) {
-                            setTimeout(function () {
-                                deleteDocFromDB(docID, (retryCount + 1));
-                            }, 1000);
-                        } else {
-                            logger.error(method, docID, 'could not be deleted from the database');
-                        }
-                    } else {
-                        logger.info(method, docID, 'was successfully deleted from the database');
-                    }
-                });
+        manager.triggerDB.getDocument({
+            db: manager.databaseName,
+            docId: docID
+        })
+        .then(response => {
+            var rev = response.result._rev; 
+            //**************************************************************
+            //* if trigger still exist in DB , then remove 
+            //**************************************************************    
+            manager.triggerDB.deleteDocument({
+                db: manager.databaseName,
+                docId: docID,
+                rev: rev
+            })
+            .then(response => {
+                logger.info(method, docID, ': Trigger was successfully deleted from the provider configuration database');
+            })
+            .catch( (err) => {
+                logger.error(method, docID, ": delete trigger confing from DB with err.code = ", err.code) ;
+                if (err.code == 409 && retryCount < 5) {
+                    logger.error(method, docID, ": There was an error deleting the trigger from the trigger configuration database with error code = 409, so will retry ");
+                    setTimeout(function () {
+                        self.deleteDocFromDB(docID, (retryCount + 1));
+                    }, 1000);
+                } else {
+                    logger.error(method, docID, ': There was an error deleting the trigger from the trigger configuration database :', err , " and retry count = ", retryCount) ;
+                }
+            })
+        })
+        .catch( (err) => {
+            if ( err && err.code == 408 && retryCount < 5) {
+                logger.error(method, docID, ": There was a timeout in getDocument() to identify trigger for deletion from the trigger configuration database, so will retry ");
+                setTimeout(function () {
+                    self.deleteDocFromDB(docID, (retryCount + 1));
+                }, 1000);
+            } else if ( err && err.code == 404) {
+                logger.warn(method,docID, ': doc to delete does not exist in trigger config DB at this time. ');  
             } else {
-                logger.error(method, docID, 'could not be found in the database');
+                logger.error(method, docID, ': could not be found as document in the trigger config database err = :', err);
             }
-        });
+        })
     }
 
 };
