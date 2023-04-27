@@ -45,7 +45,7 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.pauseResumeEnabled = "true";   //* By default it is switched ON
     this.changesFilterEnabled = "true"; //* By default it is switched ON
     this.healthObject; 
-    this.openTimeout = process.env.HTTP_OPEN_TIMEOUT_MS || 30000;
+    this.openTimeout = parseInt(process.env.HTTP_OPEN_TIMEOUT_MS) || 30000;
     
     //****************************************************
     //* Registering of Health object which can be used 
