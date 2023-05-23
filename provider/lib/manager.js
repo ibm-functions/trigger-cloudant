@@ -910,7 +910,11 @@ module.exports = function (logger, triggerDB, redisClient) {
         	}else {
         	    needleOptions.json = true
                 needleParams = body;
-        	    needle.request( needleMethod, needleUrl, needleParams, needleOptions ,cb);
+              let stream = needle.request(needleMethod, needleUrl, needleParams, needleOptions, cb);
+
+              stream.on('timeout', (type) => {
+                cb(new Error(`timeout during request: type=${type}, trigger=${triggerData.id}`));
+              });
             }
        
         })
