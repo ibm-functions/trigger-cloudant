@@ -20,6 +20,7 @@ const LRU = require('lru-cache');
 var HttpStatus = require('http-status-codes');
 var constants = require('./constants.js');
 var authHandler = require('./authHandler');
+var https = require('https');
 
 var isShutdown = false; 
 
@@ -46,7 +47,13 @@ module.exports = function (logger, triggerDB, redisClient) {
     this.changesFilterEnabled = "true"; //* By default it is switched ON
     this.healthObject; 
     this.openTimeout = parseInt(process.env.HTTP_OPEN_TIMEOUT_MS) || 30000;
-    
+    this.httpAgent = new https.Agent({
+      keepAlive: process.env.HTTP_SOCKET_KEEP_ALIVE === 'true',
+      maxSockets: parseInt(process.env.HTTP_MAX_SOCKETS) || 400,
+      maxTotalSockets: parseInt(process.env.HTTP_MAX_TOTAL_SOCKETS) || 800,
+      scheduling: process.env.HTTP_SCHEDULING || 'lifo',
+    });
+
     //****************************************************
     //* Registering of Health object which can be used 
     //* to update the self-test monitor status whenever 
@@ -879,9 +886,11 @@ module.exports = function (logger, triggerDB, redisClient) {
         	var needleMethod = requestOptions.method; 
         	var needleUrl = requestOptions.uri;
         	var needleOptions = {
-                rejectUnauthorized: false,
-                open_timeout: self.openTimeout
-            };
+            agent: self.httpAgent,
+            open_timeout: self.openTimeout,
+            rejectUnauthorized: false,
+          };
+
             if( requestOptions.auth.user ) {   //* cf-based authorization 
                 const usernamePassword = requestOptions.auth.user  +":"+ requestOptions.auth.pass;
                 const usernamePasswordEnc = Buffer.from(usernamePassword).toString('base64');
