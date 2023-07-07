@@ -18,4 +18,5 @@ RUN cd /cloudantTrigger && npm install --omit=dev
 
 RUN sed -i 's/HEARTBEAT_TIMEOUT_COEFFICIENT = 1.25;/HEARTBEAT_TIMEOUT_COEFFICIENT = 3.25;/g' /cloudantTrigger/node_modules/cloudant-follow/lib/feed.js
 
+
 ADD provider/. /cloudantTrigger/
