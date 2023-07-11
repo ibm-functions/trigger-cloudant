@@ -16,7 +16,8 @@ RUN cd /cloudantTrigger && npm install --omit=dev
 #               So the HEARTBEAT_TIMEOUT_COEFFICIENT of the follow lib needs to be adpted. Because follow-lib package will 
 #               not be updated, this settings update needs to be done  during the provider image build by patching the feed.js file 
 
-RUN sed -i 's/HEARTBEAT_TIMEOUT_COEFFICIENT = 1.25;/HEARTBEAT_TIMEOUT_COEFFICIENT = 3.25;/g' /cloudantTrigger/node_modules/cloudant-follow/lib/feed.js
+#### Removed  heartbeat fix, as tested in customer scenario and realized the fix did not work 
+# RUN sed -i 's/HEARTBEAT_TIMEOUT_COEFFICIENT = 1.25;/HEARTBEAT_TIMEOUT_COEFFICIENT = 3.25;/g' /cloudantTrigger/node_modules/cloudant-follow/lib/feed.js
 
 
 ADD provider/. /cloudantTrigger/
