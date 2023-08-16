@@ -22,7 +22,7 @@ var constants = require('./constants.js');
 var authHandler = require('./authHandler');
 const { CloudantV1 } = require('@ibm-cloud/cloudant');
 const { IamAuthenticator, BasicAuthenticator  } = require('ibm-cloud-sdk-core');
-
+var https = require('https');
 var isShutdown = false; 
 
 module.exports = function (logger, triggerDB, redisClient, databaseName) {
@@ -48,6 +48,12 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
     self.changesFilterEnabled = "true"; //* By default it is switched ON
     self.healthObject; 
     self.databaseName = databaseName;
+    this.httpAgent = new https.Agent({
+      keepAlive: process.env.HTTP_SOCKET_KEEP_ALIVE === 'true',
+      maxSockets: parseInt(process.env.HTTP_MAX_SOCKETS) || 400,
+      maxTotalSockets: parseInt(process.env.HTTP_MAX_TOTAL_SOCKETS) || 800,
+      scheduling: process.env.HTTP_SCHEDULING || 'lifo',
+    });
     
     //****************************************************
     //* Registering of Health object which can be used 
@@ -1202,8 +1208,11 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
         	var needleMethod = requestOptions.method; 
         	var needleUrl = requestOptions.uri;
         	var needleOptions = {
-                rejectUnauthorized: false
-            };
+            agent: self.httpAgent,
+            open_timeout: self.openTimeout,
+            rejectUnauthorized: false,
+          };
+
             if( requestOptions.auth.user ) {   //* cf-based authorization 
                 const usernamePassword = requestOptions.auth.user  +":"+ requestOptions.auth.pass;
                 const usernamePasswordEnc = Buffer.from(usernamePassword).toString('base64');
@@ -1223,7 +1232,11 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
         	}else {
         	    needleOptions.json = true
                 needleParams = body;
-        	    needle.request( needleMethod, needleUrl, needleParams, needleOptions ,cb);
+              let stream = needle.request(needleMethod, needleUrl, needleParams, needleOptions, cb);
+
+              stream.on('timeout', (type) => {
+                cb(new Error(`timeout during request: type=${type}, trigger=${triggerData.id}`));
+              });
             }
        
         })
