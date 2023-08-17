@@ -48,6 +48,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
     self.changesFilterEnabled = "true"; //* By default it is switched ON
     self.healthObject; 
     self.databaseName = databaseName;
+    this.openTimeout = parseInt(process.env.HTTP_OPEN_TIMEOUT_MS) || 30000;
     this.httpAgent = new https.Agent({
       keepAlive: process.env.HTTP_SOCKET_KEEP_ALIVE === 'true',
       maxSockets: parseInt(process.env.HTTP_MAX_SOCKETS) || 400,
