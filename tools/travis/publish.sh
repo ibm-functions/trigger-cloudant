@@ -26,3 +26,4 @@ if [ ${dockerhub_image_tag} == "nightly" ]; then
   echo docker push ${dockerhub_githash_image}
   docker push ${dockerhub_githash_image}
 fi
+
