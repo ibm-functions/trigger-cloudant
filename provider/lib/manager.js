@@ -783,7 +783,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
             
             self.triggerDB.postView( postViewParams)
             .then(response => {
-                logger.info(method, 'Found trigger document : ', response);
+                // (only debug log statement) logger.info(method, 'Found trigger document : ', response);
                 
                 if ( response.result ) {
                     var triggerConfigList = response.result.rows; 
