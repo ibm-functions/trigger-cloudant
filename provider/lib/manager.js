@@ -442,7 +442,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
             //* not create an lruCache in its triggerdata. So skip the 
             //* filtering for them 
             //*********************************************************
-            if ( !(triggerHandle.lruCache == undefined) ) {
+            if ( triggerHandle && !(triggerHandle.lruCache == undefined) ) {
                 var revInHistory = triggerHandle.lruCache.get(doc_name);
                 if (revInHistory == undefined){
                     triggerHandle.lruCache.set(doc_name, doc_revision_nr);  
@@ -1162,7 +1162,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                             //********************************************************
                             logger.info(method, 'SIGTERM Handler going to store chgHistory data to REDIS ');
                             for( triggername in self.triggers ) {
-                                if (  (!( self.triggers[triggername].lruCache == undefined )) && self.triggers[triggername].lruCache.size > 0 ) {                
+                                if (self.triggers[triggername] && self.triggers[triggername].lruCache && self.triggers[triggername].lruCache.size > 0) {               
                         
                                     let redisHashName = self.worker + "_" + triggername; 
                                     let historyDocsArrayFromCache = new Array ();
