@@ -819,12 +819,18 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                                     } else {
                                         self.createTrigger(initTrigger(doc), true)
                                         .then(triggerIdentifier => {
-                                            logger.info(method, triggerIdentifier, 'created successfully');
+                                            logger.info(method, 'trigger ', triggerIdentifier, 'created successfully');
                                         })
                                         .catch(err => {
-                                            var message = 'Automatically disabled after receiving exception on init trigger: ' + err;
-                                            disableTrigger(triggerIdentifier, undefined, message);
-                                            logger.error(method, 'Disabled trigger', triggerIdentifier, 'due to exception:', err);
+                                            // GIT issue #86: Do no more automatically disable trigger on startup , because in case of a 
+                                            //                temporarily network/DNS error all triggers got disabled 
+                                            // var message = 'Automatically disabled after receiving exception on init trigger: ' + err;
+                                            // disableTrigger(triggerIdentifier, undefined, message);
+                                            // logger.error(method, 'Disabled trigger', triggerIdentifier, 'due to exception:', err);
+                                       
+                                            logger.error(method, 'trigger ', triggerIdentifier, 'could not be started during provider start this time :', err);
+                                            logger.info(method, 'A subsequent provider stop and restart will re-activate the trigger again');
+                                       
                                         });
                                     }
                                 });
