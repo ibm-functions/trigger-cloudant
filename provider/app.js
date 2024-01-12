@@ -26,6 +26,8 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var bluebird = require('bluebird');
 var logger = require('./Logger');
+const process = require('node:process');
+
 
 var ProviderManager = require('./lib/manager.js');
 var ProviderHealth = require('./lib/health.js');
@@ -150,6 +152,15 @@ function init(server) {
     var method = 'init';
     var cloudantDb;
     var providerManager;
+
+    //********************************************************************************
+    //* Since Nodejs16  UnhandledRejections result in process termination. To avoid 
+    //* this new behavior the process scope handler is registered
+    //******************************************************************************* 
+    process.on('unhandledRejection', (reason, promise) => {
+        logger.info(method, 'Cloudant provider caught an Unhandled Rejection at promise:' + promise + ' reason: ' +  reason );
+        //Application specific logging, throwing an error, or other logic here
+    });
 
     if (server !== null) {
         var address = server.address();
