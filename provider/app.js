@@ -224,6 +224,23 @@ function init(server) {
                 providerHealth.monitor(monitoringAuth, monitoringInterval);
             }, monitoringInterval);
         }
+
+        //***************************************************************
+        //* ISSUE: Cloudant provider gets OOM  if reach > 5GB heapSize
+        //*   -> Add dynamic tracing if  heapSize reach limit of 3 GB 
+        //***************************************************************
+        setInterval(function () { 
+            var heapSize ; 
+            heapSize = Math.round(v8.getHeapStatistics().total_heap_size / 1000000 );  // calc in MB 
+        
+            logger.info(method, "heap usage: " , heapSize);
+            if ( heapSize > 3000 ) {
+              v8.setFlagsFromString('--trace-gc');
+            } else {
+              v8.setFlagsFromString('--notrace-gc');
+            }
+        }, monitoringInterval );   
+
     })
     .catch(err => {
         logger.error(method, 'The following connection error occurred:', err);
