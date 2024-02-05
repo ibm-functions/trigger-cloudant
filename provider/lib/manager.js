@@ -72,6 +72,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
     this.createTrigger = function (triggerData, isStartup) {
         var method = 'createTrigger';
         var postChangesTimeout = 50000;  //** 50 seconds to wait max in one call for a doc change 
+        let options;
 
         var dbURL = `${triggerData.protocol}://${triggerData.host}`;
         if (triggerData.port) {
@@ -344,7 +345,8 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                 //************************************************************************
                 if ( Object.keys(response).length === 0  ) {
                     logger.error(method, " : Cloudant-SDK provided an unexpected empty response object on postChanges() call.");
-                    seq = seq; 
+                    //* Intentionally continuing with the same seq as in previous loop-run. NO need to explicitly set it       
+                    //* seq = seq; 
                 } else if ( response  && response.result.results == 0  ) {
                     var lastSeq = response.result.last_seq ;
                     //**Continue to  loop with provided seq number 
@@ -361,7 +363,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                 
                     logger.info(method, 'Trigger', triggerData.id, ' got change from customer DB, with lastseq = ', lastSeq );
                 
-                    for ( i = 0 ; i < numOfChangesDetected; i++ ) {
+                    for ( let i = 0 ; i < numOfChangesDetected; i++ ) {
                         // logger.info(method, 'Trigger', triggerData.id, '!!!!!! customerDB Obj =   " , response.result.results[i]);
                         customerDbChangeHandler(triggerData, response.result.results[i] ); 
                     }
@@ -929,7 +931,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                 var numOfChangesDetected = Object.keys(response.result.results).length
                 logger.info(method,  numOfChangesDetected + " changes records received from configDB with last seq : ", lastSeq);
         
-                for ( i = 0 ; i < numOfChangesDetected; i++ ) {
+                for ( let i = 0 ; i < numOfChangesDetected; i++ ) {
                     //***********************************************************************
                     //* Do not write logs for changes received for  monitoring self-test triggers 
                     //* assigned to other worker host. 
@@ -1014,7 +1016,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                 return sendError(method, HttpStatus.BAD_REQUEST, 'Malformed request, basic authentication expected', res);
             }
 
-            var auth = new Buffer(parts[1], 'base64').toString();
+            var auth = Buffer.from(parts[1], 'base64').toString();
             auth = auth.match(/^([^:]*):(.*)$/);
             if (!auth) {
                 return sendError(method, HttpStatus.BAD_REQUEST, 'Malformed request, authentication invalid', res);
@@ -1167,7 +1169,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
                             //* be reloaded on next re-start of this worker
                             //********************************************************
                             logger.info(method, 'SIGTERM Handler going to store chgHistory data to REDIS ');
-                            for( triggername in self.triggers ) {
+                            for( let triggername in self.triggers ) {
                                 if (self.triggers[triggername] && self.triggers[triggername].lruCache && self.triggers[triggername].lruCache.size > 0) {               
                         
                                     let redisHashName = self.worker + "_" + triggername; 
@@ -1289,7 +1291,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
     serialize = function(obj, prefix) {
         var str = [],
         p;
-        for (p in obj) {
+        for ( let p in obj) {
             if (obj.hasOwnProperty(p)) {
                 var k = prefix ? prefix + "[" + p + "]" : p,
                 v = obj[p];

@@ -78,7 +78,7 @@ function requestHelper(url, input, method) {
 serialize = function(obj, prefix) {
   var str = [],
   p;
-  for (p in obj) {
+  for ( let p in obj) {
     if (obj.hasOwnProperty(p)) {
       var k = prefix ? prefix + "[" + p + "]" : p,
         v = obj[p];
