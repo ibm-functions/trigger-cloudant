@@ -278,7 +278,7 @@ module.exports = function (logger, triggerDB, redisClient, databaseName) {
 			  feed : 'longpoll',
 			  timeout : timeout,
 			  since: seq ,
-              limit: 10,      // To avoid overload of provider by huge num of concurrent changes in a customer DB, limit to 10
+			  limit: 10,      // To avoid overload of provider by huge num of concurrent changes in a customer DB, limit to 10
 			  includeDocs : false 
 			}
 					
